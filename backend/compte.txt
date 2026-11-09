@@ -1,0 +1,22 @@
+
+=== COMPTES CRÉÉS ===
+Identifiant : secdrbf
+Rôle        : SecDRBF
+------------------------------
+Identifiant : secsrsp
+Rôle        : SecSRSP
+Mot de passe: B2CI4bM7AeavH7x4
+------------------------------
+Identifiant : solde
+Rôle        : DIVISION_SOLDE
+Mot de passe: _gx7aTMTzx0TUej1
+------------------------------
+Identifiant : visa
+Rôle        : DIVISION_VISA
+Mot de passe: YmLq0lzAOGl-2XlP
+------------------------------
+Identifiant : pensions
+Rôle        : DIVISION_PENSIONS
+Mot de passe: -Uv1RKz2_IZ-eU5p
+------------------------------
+Rôle        : DIVISION_SECOURS

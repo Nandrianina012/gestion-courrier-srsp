@@ -15,8 +15,7 @@ type SituationFiltre = "non_transferes" | "transferes" | "tous";
 type StatutFiltre =
   | "tous"
   | "En attente"
-  | "En cours de traitement"
-  | "Validé"
+  | "Visé"
   | "Rejeté"
   | "Remis";
 
@@ -56,8 +55,7 @@ function resumeStatuts(
 
   const ordre = [
     "En attente",
-    "En cours de traitement",
-    "Validé",
+    "Visé",
     "Rejeté",
     "Remis",
   ];
@@ -68,8 +66,8 @@ function resumeStatuts(
       const nombre = compteurs[statut];
 
       const libelle =
-        statut === "Validé" && nombre > 1
-          ? "Validés"
+        statut === "Visé" && nombre > 1
+          ? "Visés"
           : statut === "Rejeté" && nombre > 1
             ? "Rejetés"
             : statut;
@@ -85,6 +83,20 @@ function estNonTransfere(dossier: Dossier) {
 
 function estTransfereVersDivision(dossier: Dossier) {
   return (dossier.localisationActuelle ?? "").startsWith("DIVISION_");
+}
+
+function dossierEnSouffrance(dossier: Dossier) {
+  if (dossier.statutDossier !== "En attente" || !dossier.dateEnvoi) {
+    return false;
+  }
+
+  const dateArrivee = new Date(dossier.dateEnvoi).getTime();
+  const delai = 5 * 24 * 60 * 60 * 1000;
+
+  return (
+    Number.isFinite(dateArrivee) &&
+    Date.now() - dateArrivee >= delai
+  );
 }
 
 function bePossedeStatut(dossier: Dossier, statut: StatutFiltre) {
@@ -178,7 +190,7 @@ export default function DossiersSecSRSP({
             <option value="En cours de traitement">
               En cours de traitement
             </option>
-            <option value="Validé">Validé(s)</option>
+            <option value="Visé">Visé(s)</option>
             <option value="Rejeté">Rejeté(s)</option>
             <option value="Remis">Remis</option>
           </select>
@@ -286,7 +298,16 @@ export default function DossiersSecSRSP({
                     </td>
 
                     <td className="px-4 py-3">
-                      <span className="inline-block rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-[#705212]">
+                      <span
+                        className={`inline-flex items-center justify-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold shadow-sm transition-all duration-200 ${
+                          dossierEnSouffrance(dossier)
+                            ? "animate-[pulse_1.2s_ease-in-out_infinite] border-red-300 bg-red-100 text-red-800 ring-4 ring-red-200/70"
+                            : "border-amber-200 bg-amber-50 text-[#705212]"
+                        }`}
+                      >
+                        {dossierEnSouffrance(dossier) && (
+                          <span className="inline-block h-2.5 w-2.5 rounded-full bg-red-600" />
+                        )}
                         {statutAffiche}
                       </span>
 

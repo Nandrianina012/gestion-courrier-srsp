@@ -10,6 +10,7 @@ import DossiersDivision from "./DossiersDivision";
 import DossiersAdmin from "./DossiersAdmin";
 import DossierDetailsModal from "./DossierDetailsModal";
 import TransfertModal from "./TransfertModal";
+import CreationBEDepart from "./CreationBEDepart";
 
 export type Utilisateur = {
   idUtilisateur: number;
@@ -167,7 +168,7 @@ export default function DossiersPage() {
   const [confirmationEnvoiOuverte, setConfirmationEnvoiOuverte] =
     useState(false);
 
-  const [dossierAValider, setDossierAValider] = useState<Dossier | null>(null);
+  const [dossierAViser, setDossierAViser] = useState<Dossier | null>(null);
 
   const [dossierARejeter, setDossierARejeter] = useState<Dossier | null>(null);
 
@@ -180,6 +181,32 @@ export default function DossiersPage() {
   );
 
   const [remiseEnCours, setRemiseEnCours] = useState(false);
+
+  const [creationBEDepartOuverte, setCreationBEDepartOuverte] = useState(false);
+
+  useEffect(() => {
+    if (!afficherFormulaire && !creationBEDepartOuverte) {
+      return;
+    }
+
+    const ancienOverflow = document.body.style.overflow;
+
+    document.body.style.overflow = "hidden";
+
+    function fermerAvecEchap(evenement: KeyboardEvent) {
+      if (evenement.key === "Escape") {
+        setAfficherFormulaire(false);
+        setCreationBEDepartOuverte(false);
+      }
+    }
+
+    window.addEventListener("keydown", fermerAvecEchap);
+
+    return () => {
+      document.body.style.overflow = ancienOverflow;
+      window.removeEventListener("keydown", fermerAvecEchap);
+    };
+  }, [afficherFormulaire, creationBEDepartOuverte]);
 
   useEffect(() => {
     if (!toast) return;
@@ -648,6 +675,8 @@ export default function DossiersPage() {
 
       reinitialiserFormulaire();
 
+      setAfficherFormulaire(false);
+
       window.dispatchEvent(new Event("actualiser-notifications"));
 
       await chargerDossiers(token);
@@ -763,12 +792,12 @@ export default function DossiersPage() {
     setDossierARenvoyer(dossier);
   }
 
-  function demanderValidation(dossier: Dossier) {
-    setDossierAValider(dossier);
+  function demanderVisa(dossier: Dossier) {
+    setDossierAViser(dossier);
   }
 
-  async function confirmerValidation() {
-    if (!dossierAValider) {
+  async function confirmerVisa() {
+    if (!dossierAViser) {
       return;
     }
 
@@ -783,7 +812,7 @@ export default function DossiersPage() {
 
     try {
       const reponse = await fetch(
-        `${API}/api/dossiers/${dossierAValider.idDossier}/valider`,
+        `${API}/api/dossiers/${dossierAViser.idDossier}/viser`,
         {
           method: "POST",
           headers: {
@@ -800,17 +829,17 @@ export default function DossiersPage() {
         throw new Error(
           typeof detail === "string"
             ? detail
-            : (detail?.message ?? "Impossible de valider le dossier."),
+            : (detail?.message ?? "Impossible de viser le dossier."),
         );
       }
 
-      setDossierAValider(null);
+      setDossierAViser(null);
 
       window.dispatchEvent(new Event("actualiser-notifications"));
 
       setToast({
         type: "succes",
-        message: resultat?.message ?? "Le dossier a été validé avec succès.",
+        message: resultat?.message ?? "Le dossier a été visé avec succès.",
       });
 
       await chargerDossiers(token);
@@ -967,56 +996,6 @@ export default function DossiersPage() {
       });
     } finally {
       setDecisionEnCours(false);
-    }
-  }
-
-  async function commencerTraitement(dossier: Dossier) {
-    const token = sessionStorage.getItem("access_token");
-
-    if (!token) {
-      router.replace("/login");
-      return;
-    }
-
-    try {
-      const reponse = await fetch(
-        `${API}/api/dossiers/${dossier.idDossier}/commencer-traitement`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-
-      const resultat = await reponse.json().catch(() => null);
-
-      if (!reponse.ok) {
-        const detail = resultat?.detail;
-
-        throw new Error(
-          typeof detail === "string"
-            ? detail
-            : (detail?.message ?? "Impossible de commencer le traitement."),
-        );
-      }
-
-      window.dispatchEvent(new Event("actualiser-notifications"));
-
-      setToast({
-        type: "succes",
-        message: resultat?.message ?? "Le traitement du dossier a commencé.",
-      });
-
-      await chargerDossiers(token);
-    } catch (error) {
-      setToast({
-        type: "erreur",
-        message:
-          error instanceof Error
-            ? error.message
-            : "Une erreur inattendue est survenue.",
-      });
     }
   }
 
@@ -1373,8 +1352,8 @@ export default function DossiersPage() {
         </div>
       )}
 
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div>
+      <div className="flex flex-col gap-4 mb-6 lg:flex-row lg:items-end lg:justify-between">
+        <div className="min-w-0">
           <p className="text-sm font-medium text-[#8C6A1E]">
             {estSecDRBF
               ? "Secrétariat DRBF"
@@ -1394,8 +1373,18 @@ export default function DossiersPage() {
           </p>
         </div>
 
+        {estDivision && (
+          <button
+            type="button"
+            onClick={() => setCreationBEDepartOuverte((ouverte) => !ouverte)}
+            className="shrink-0 rounded-lg bg-gradient-to-r from-[#8C6A1E] via-[#B38528] to-[#C6A04A] px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:opacity-90"
+          >
+            {creationBEDepartOuverte ? "Fermer" : "Créer un BE"}
+          </button>
+        )}
+
         {estSecDRBF && (
-          <div className="flex flex-wrap gap-3">
+          <div className="flex shrink-0 flex-row flex-wrap items-center gap-3">
             <button
               type="button"
               onClick={() => {
@@ -1408,10 +1397,11 @@ export default function DossiersPage() {
                   void chargerProchainNumeroBE();
                 }
               }}
-              className="rounded-lg bg-gradient-to-r from-[#8C6A1E] via-[#B38528] to-[#C6A04A] px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:opacity-90"
+              className="shrink-0 rounded-lg bg-gradient-to-r from-[#8C6A1E] via-[#B38528] to-[#C6A04A] px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:opacity-90"
             >
               {afficherFormulaire ? "Fermer" : "+ Nouveau BE"}
             </button>
+
             <button
               type="button"
               onClick={() => setConfirmationEnvoiOuverte(true)}
@@ -1421,383 +1411,422 @@ export default function DossiersPage() {
                   (dossier) => dossier.localisationActuelle === "SecDRBF",
                 )
               }
-              className="rounded-lg bg-gradient-to-r from-[#8C6A1E] via-[#B38528] to-[#C6A04A] px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="shrink-0 rounded-lg bg-gradient-to-r from-[#8C6A1E] via-[#B38528] to-[#C6A04A] px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {envoiBEsEnCours
                 ? "Envoi en cours..."
                 : "Envoyer les BE enregistrés à SRSP"}
             </button>
-
-            
           </div>
         )}
       </div>
 
+      {estDivision && creationBEDepartOuverte && (
+        <CreationBEDepart
+          dossiers={dossiers}
+          roleDivision={role}
+          onFermer={() => setCreationBEDepartOuverte(false)}
+        />
+      )}
+
       {estSecDRBF && afficherFormulaire && (
-        <div className="rounded-xl border border-amber-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-6 text-lg font-semibold text-slate-900">
-            Enregistrer un nouveau bordereau d'envoi (BE)
-          </h2>
-
-          <form
-            onSubmit={creerDossier}
-            className="grid grid-cols-1 gap-5 md:grid-cols-2"
+        <div
+          role="presentation"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget && !enregistrement) {
+              setAfficherFormulaire(false);
+            }
+          }}
+          className="be-modal-backdrop fixed inset-0 z-[150] flex items-start justify-center overflow-y-auto bg-slate-900/50 p-0 sm:p-6"
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="titre-nouveau-be-secdrbf"
+            className="be-modal-panel max-h-[100dvh] w-full max-w-5xl overflow-y-auto rounded-none border border-amber-200 bg-white p-5 shadow-2xl sm:max-h-[calc(100dvh-3rem)] sm:rounded-xl sm:p-6"
           >
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                Numéro du BE
-              </label>
+            <div className="sticky -mx-5 -mt-5 mb-6 flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-5 py-4 sm:-mx-6 sm:-mt-6 sm:px-6">
+              <h2
+                id="titre-nouveau-be-secdrbf"
+                className="text-lg font-semibold text-slate-900"
+              >
+                Enregistrer un nouveau bordereau d'envoi (BE)
+              </h2>
 
-              <input
-                type="number"
-                value={numeroBE ?? ""}
-                readOnly
-                placeholder={
-                  chargementNumeroBE ? "Chargement..." : "Numéro indisponible"
-                }
-                className={`${CLASSE_INPUT} bg-slate-100`}
-              />
-
-              <p className="mt-1 text-xs text-slate-500">Sous numéro</p>
+              <button
+                type="button"
+                onClick={() => setAfficherFormulaire(false)}
+                aria-label="Fermer le formulaire"
+                className="rounded-lg px-3 py-1 text-2xl text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+              >
+                ×
+              </button>
             </div>
+            <h2 className="mb-6 text-lg font-semibold text-slate-900">
+              Enregistrer un nouveau bordereau d'envoi{" "}
+            </h2>
 
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                Référence du BE
-              </label>
+            <form
+              onSubmit={creerDossier}
+              className="grid grid-cols-1 gap-5 md:grid-cols-2"
+            >
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                  Numéro du BE
+                </label>
 
-              <input
-                type="text"
-                required
-                value={referenceDossier}
-                onBlur={() => setReferenceTouchee(true)}
-                onChange={(e) => {
-                  setReferenceDossier(e.target.value);
-                  setErreurFormulaire("");
-                }}
-                placeholder="Ex. N°2026/06-DREN.H.M/SGRH/DIV.S"
-                className={`${CLASSE_INPUT} ${
-                  referenceTouchee && !referenceDossier.trim()
-                    ? "border-red-400 focus:border-red-500 focus:ring-red-500"
-                    : ""
-                }`}
-              />
+                <input
+                  type="number"
+                  value={numeroBE ?? ""}
+                  readOnly
+                  placeholder={
+                    chargementNumeroBE ? "Chargement..." : "Numéro indisponible"
+                  }
+                  className={`${CLASSE_INPUT} bg-slate-100`}
+                />
 
-              {referenceTouchee && !referenceDossier.trim() && (
-                <p className="mt-1 text-xs text-red-600">
-                  La référence du BE est obligatoire.
-                </p>
-              )}
-            </div>
-
-            <div className="relative">
-              <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                Objet
-              </label>
-
-              <input
-                type="text"
-                required
-                value={objet}
-                onFocus={() => setObjetSuggestionsVisibles(true)}
-                onBlur={() => {
-                  setObjetTouche(true);
-
-                  window.setTimeout(() => {
-                    setObjetSuggestionsVisibles(false);
-                  }, 150);
-                }}
-                onChange={(e) => {
-                  setObjet(e.target.value);
-                  setObjetSuggestionsVisibles(true);
-                  setErreurFormulaire("");
-                }}
-                placeholder="Ex. Demande d'avancement"
-                className={`${CLASSE_INPUT} ${
-                  objetTouche && !objet.trim()
-                    ? "border-red-400 focus:border-red-500 focus:ring-red-500"
-                    : ""
-                }`}
-              />
-
-              {objetSuggestionsVisibles && objetsFiltres.length > 0 && (
-                <div className="absolute left-0 right-0 top-full z-40 mt-1 max-h-64 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
-                  {objetsFiltres.map((objetDisponible, index) => (
-                    <button
-                      key={`${objetDisponible}-${index}`}
-                      type="button"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => {
-                        setObjet(objetDisponible);
-                        setObjetSuggestionsVisibles(false);
-                        setErreurFormulaire("");
-                      }}
-                      className="block w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-amber-50 hover:text-[#8C6A1E]"
-                    >
-                      {objetDisponible}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {objetTouche && !objet.trim() && (
-                <p className="mt-1 text-xs text-red-600">
-                  L'objet du BE est obligatoire.
-                </p>
-              )}
-            </div>
-
-            <div className="md:col-span-2">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                <h3 className="text-sm font-semibold text-slate-900">
-                  Agents concernés ({agentsFormulaire.length})
-                </h3>
-
-                <button
-                  type="button"
-                  onClick={ajouterAgent}
-                  className="rounded-lg border border-[#B38528] px-3 py-2 text-sm font-medium text-[#705212] hover:bg-amber-50"
-                >
-                  + Ajouter un autre agent
-                </button>
+                <p className="mt-1 text-xs text-slate-500">Sous numéro</p>
               </div>
 
-              <div className="space-y-4">
-                {agentsFormulaire.map((agent, index) => {
-                  const imEnDouble =
-                    agent.IM.trim() !== "" &&
-                    agentsFormulaire.filter(
-                      (autre) =>
-                        autre.IM.trim().toLowerCase() ===
-                        agent.IM.trim().toLowerCase(),
-                    ).length > 1;
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                  Référence du BE
+                </label>
 
-                  const imVide =
-                    imsTouches.includes(agent.cle) && !agent.IM.trim();
+                <input
+                  type="text"
+                  required
+                  value={referenceDossier}
+                  onBlur={() => setReferenceTouchee(true)}
+                  onChange={(e) => {
+                    setReferenceDossier(e.target.value);
+                    setErreurFormulaire("");
+                  }}
+                  placeholder="Ex. N°2026/06-DREN.H.M/SGRH/DIV.S"
+                  className={`${CLASSE_INPUT} ${
+                    referenceTouchee && !referenceDossier.trim()
+                      ? "border-red-400 focus:border-red-500 focus:ring-red-500"
+                      : ""
+                  }`}
+                />
 
-                  return (
-                    <div
-                      key={agent.cle}
-                      className="rounded-lg border border-slate-200 bg-slate-50 p-4"
-                    >
-                      <div className="mb-3 flex items-center justify-between gap-3">
-                        <h4 className="text-sm font-semibold text-slate-800">
-                          Agent {index + 1}
-                        </h4>
+                {referenceTouchee && !referenceDossier.trim() && (
+                  <p className="mt-1 text-xs text-red-600">
+                    La référence du BE est obligatoire.
+                  </p>
+                )}
+              </div>
 
-                        {agentsFormulaire.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => retirerAgent(agent.cle)}
-                            className="text-sm text-red-600 hover:underline"
-                          >
-                            Retirer
-                          </button>
-                        )}
-                      </div>
+              <div className="relative">
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                  Objet
+                </label>
 
-                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <div>
-                          <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                            IM
-                          </label>
+                <input
+                  type="text"
+                  required
+                  value={objet}
+                  onFocus={() => setObjetSuggestionsVisibles(true)}
+                  onBlur={() => {
+                    setObjetTouche(true);
 
-                          <input
-                            type="text"
-                            required
-                            value={agent.IM}
-                            onBlur={() =>
-                              setImsTouches((anciens) =>
-                                anciens.includes(agent.cle)
-                                  ? anciens
-                                  : [...anciens, agent.cle],
-                              )
-                            }
-                            onChange={(e) =>
-                              programmerRechercheAgent(
-                                agent.cle,
-                                e.target.value,
-                              )
-                            }
-                            placeholder="Numéro matricule"
-                            className={`w-full rounded-lg border bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:ring-1 ${
-                              imVide
-                                ? "border-red-400 focus:border-red-500 focus:ring-red-500"
-                                : agent.agentTrouve
-                                  ? "border-green-400 focus:border-green-500 focus:ring-green-500"
-                                  : "border-slate-300 focus:border-[#B38528] focus:ring-[#B38528]"
-                            }`}
-                          />
+                    window.setTimeout(() => {
+                      setObjetSuggestionsVisibles(false);
+                    }, 150);
+                  }}
+                  onChange={(e) => {
+                    setObjet(e.target.value);
+                    setObjetSuggestionsVisibles(true);
+                    setErreurFormulaire("");
+                  }}
+                  placeholder="Ex. Demande d'avancement"
+                  className={`${CLASSE_INPUT} ${
+                    objetTouche && !objet.trim()
+                      ? "border-red-400 focus:border-red-500 focus:ring-red-500"
+                      : ""
+                  }`}
+                />
 
-                          {imVide && (
-                            <p className="mt-1 text-xs text-red-600">
-                              L'IM est obligatoire.
-                            </p>
-                          )}
+                {objetSuggestionsVisibles && objetsFiltres.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full z-40 mt-1 max-h-64 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+                    {objetsFiltres.map((objetDisponible, index) => (
+                      <button
+                        key={`${objetDisponible}-${index}`}
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          setObjet(objetDisponible);
+                          setObjetSuggestionsVisibles(false);
+                          setErreurFormulaire("");
+                        }}
+                        className="block w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-amber-50 hover:text-[#8C6A1E]"
+                      >
+                        {objetDisponible}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
-                          {imEnDouble && (
-                            <p className="mt-1 text-xs text-red-600">
-                              Cet IM est déjà utilisé dans ce BE.
-                            </p>
-                          )}
+                {objetTouche && !objet.trim() && (
+                  <p className="mt-1 text-xs text-red-600">
+                    L'objet du BE est obligatoire.
+                  </p>
+                )}
+              </div>
 
-                          {agent.rechercheEnCours && (
-                            <p className="mt-1 text-xs text-slate-500">
-                              Recherche de l'agent...
-                            </p>
-                          )}
+              <div className="md:col-span-2">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    Agents concernés ({agentsFormulaire.length})
+                  </h3>
 
-                          {agent.agentTrouve && (
-                            <p className="mt-1 text-xs text-green-700">
-                              Agent trouvé : {agent.agentTrouve.nomComplet}
-                            </p>
-                          )}
+                  <button
+                    type="button"
+                    onClick={ajouterAgent}
+                    className="rounded-lg border border-[#B38528] px-3 py-2 text-sm font-medium text-[#705212] hover:bg-amber-50"
+                  >
+                    + Ajouter un autre agent
+                  </button>
+                </div>
 
-                          {agent.agentNonTrouve && (
-                            <p className="mt-1 text-xs text-amber-700">
-                              Aucun agent trouvé pour cet IM. Saisissez son nom
-                              complet pour continuer.
-                            </p>
+                <div className="space-y-4">
+                  {agentsFormulaire.map((agent, index) => {
+                    const imEnDouble =
+                      agent.IM.trim() !== "" &&
+                      agentsFormulaire.filter(
+                        (autre) =>
+                          autre.IM.trim().toLowerCase() ===
+                          agent.IM.trim().toLowerCase(),
+                      ).length > 1;
+
+                    const imVide =
+                      imsTouches.includes(agent.cle) && !agent.IM.trim();
+
+                    return (
+                      <div
+                        key={agent.cle}
+                        className="rounded-lg border border-slate-200 bg-slate-50 p-4"
+                      >
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                          <h4 className="text-sm font-semibold text-slate-800">
+                            Agent {index + 1}
+                          </h4>
+
+                          {agentsFormulaire.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => retirerAgent(agent.cle)}
+                              className="text-sm text-red-600 hover:underline"
+                            >
+                              Retirer
+                            </button>
                           )}
                         </div>
 
-                        <div>
-                          <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                            Nom complet de l'agent
-                          </label>
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                          <div>
+                            <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                              IM
+                            </label>
 
-                          <input
-                            type="text"
-                            required={!agent.agentTrouve}
-                            value={agent.nomCompletAgent}
-                            onChange={(e) => {
-                              modifierAgent(agent.cle, {
-                                nomCompletAgent: e.target.value,
-                              });
+                            <input
+                              type="text"
+                              required
+                              value={agent.IM}
+                              onBlur={() =>
+                                setImsTouches((anciens) =>
+                                  anciens.includes(agent.cle)
+                                    ? anciens
+                                    : [...anciens, agent.cle],
+                                )
+                              }
+                              onChange={(e) =>
+                                programmerRechercheAgent(
+                                  agent.cle,
+                                  e.target.value,
+                                )
+                              }
+                              placeholder="Numéro matricule"
+                              className={`w-full rounded-lg border bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:ring-1 ${
+                                imVide
+                                  ? "border-red-400 focus:border-red-500 focus:ring-red-500"
+                                  : agent.agentTrouve
+                                    ? "border-green-400 focus:border-green-500 focus:ring-green-500"
+                                    : "border-slate-300 focus:border-[#B38528] focus:ring-[#B38528]"
+                              }`}
+                            />
 
-                              setErreurFormulaire("");
-                            }}
-                            disabled={!!agent.agentTrouve}
-                            placeholder={
-                              agent.agentTrouve
-                                ? "Nom récupéré automatiquement"
-                                : "Nom et prénoms"
-                            }
-                            className={`w-full rounded-lg border px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none ${
-                              agent.agentTrouve
-                                ? "border-green-300 bg-green-50"
-                                : agent.agentNonTrouve &&
-                                    !agent.nomCompletAgent.trim()
-                                  ? "border-red-400 bg-white focus:border-red-500 focus:ring-red-500"
-                                  : "border-slate-300 bg-white focus:border-[#B38528] focus:ring-[#B38528]"
-                            }`}
-                          />
-
-                          {agent.agentNonTrouve &&
-                            !agent.nomCompletAgent.trim() && (
+                            {imVide && (
                               <p className="mt-1 text-xs text-red-600">
-                                Le nom complet est obligatoire si l'agent n'est
-                                pas dans la base.
+                                L'IM est obligatoire.
                               </p>
                             )}
 
-                          {agent.agentNonTrouve && (
-                            <p className="mt-1.5 text-xs text-slate-500">
-                              Sa fiche pourra être complétée lors de la mise à
-                              jour de la liste des agents.
-                            </p>
-                          )}
+                            {imEnDouble && (
+                              <p className="mt-1 text-xs text-red-600">
+                                Cet IM est déjà utilisé dans ce BE.
+                              </p>
+                            )}
+
+                            {agent.rechercheEnCours && (
+                              <p className="mt-1 text-xs text-slate-500">
+                                Recherche de l'agent...
+                              </p>
+                            )}
+
+                            {agent.agentTrouve && (
+                              <p className="mt-1 text-xs text-green-700">
+                                Agent trouvé : {agent.agentTrouve.nomComplet}
+                              </p>
+                            )}
+
+                            {agent.agentNonTrouve && (
+                              <p className="mt-1 text-xs text-amber-700">
+                                Aucun agent trouvé pour cet IM. Saisissez son
+                                nom complet pour continuer.
+                              </p>
+                            )}
+                          </div>
+
+                          <div>
+                            <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                              Nom complet de l'agent
+                            </label>
+
+                            <input
+                              type="text"
+                              required={!agent.agentTrouve}
+                              value={agent.nomCompletAgent}
+                              onChange={(e) => {
+                                modifierAgent(agent.cle, {
+                                  nomCompletAgent: e.target.value,
+                                });
+
+                                setErreurFormulaire("");
+                              }}
+                              disabled={!!agent.agentTrouve}
+                              placeholder={
+                                agent.agentTrouve
+                                  ? "Nom récupéré automatiquement"
+                                  : "Nom et prénoms"
+                              }
+                              className={`w-full rounded-lg border px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none ${
+                                agent.agentTrouve
+                                  ? "border-green-300 bg-green-50"
+                                  : agent.agentNonTrouve &&
+                                      !agent.nomCompletAgent.trim()
+                                    ? "border-red-400 bg-white focus:border-red-500 focus:ring-red-500"
+                                    : "border-slate-300 bg-white focus:border-[#B38528] focus:ring-[#B38528]"
+                              }`}
+                            />
+
+                            {agent.agentNonTrouve &&
+                              !agent.nomCompletAgent.trim() && (
+                                <p className="mt-1 text-xs text-red-600">
+                                  Le nom complet est obligatoire si l'agent
+                                  n'est pas dans la base.
+                                </p>
+                              )}
+
+                            {agent.agentNonTrouve && (
+                              <p className="mt-1.5 text-xs text-slate-500">
+                                Sa fiche pourra être complétée lors de la mise à
+                                jour de la liste des agents.
+                              </p>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
 
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                Nom complet du responsable
-              </label>
-              <input
-                type="text"
-                required
-                maxLength={150}
-                value={nomResponsable}
-                onChange={(e) => {
-                  setNomResponsable(e.target.value);
-                  setErreurFormulaire("");
-                }}
-                placeholder="Nom et prénoms de la personne qui dépose le BE"
-                className={CLASSE_INPUT}
-              />
-            </div>
-
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                Téléphone du responsable
-              </label>
-              <input
-                type="tel"
-                required
-                maxLength={30}
-                value={telephoneResponsable}
-                onChange={(e) => {
-                  setTelephoneResponsable(e.target.value);
-                  setErreurFormulaire("");
-                }}
-                placeholder="Numéro de téléphone"
-                className={CLASSE_INPUT}
-              />
-            </div>
-
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                E-mail du responsable (facultatif)
-              </label>
-              <input
-                type="email"
-                maxLength={150}
-                value={emailResponsable}
-                onChange={(e) => {
-                  setEmailResponsable(e.target.value);
-                  setErreurFormulaire("");
-                }}
-                placeholder="Adresse e-mail"
-                className={CLASSE_INPUT}
-              />
-            </div>
-
-            {erreurFormulaire && (
-              <div
-                role="alert"
-                className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 md:col-span-2"
-              >
-                {erreurFormulaire}
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                  Nom complet du responsable
+                </label>
+                <input
+                  type="text"
+                  required
+                  maxLength={150}
+                  value={nomResponsable}
+                  onChange={(e) => {
+                    setNomResponsable(e.target.value);
+                    setErreurFormulaire("");
+                  }}
+                  placeholder="Nom et prénoms de la personne qui dépose le BE"
+                  className={CLASSE_INPUT}
+                />
               </div>
-            )}
 
-            <div className="flex justify-end gap-3 md:col-span-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setAfficherFormulaire(false);
-                  setErreurFormulaire("");
-                }}
-                className="rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              >
-                Annuler
-              </button>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                  Téléphone du responsable
+                </label>
+                <input
+                  type="tel"
+                  required
+                  maxLength={30}
+                  value={telephoneResponsable}
+                  onChange={(e) => {
+                    setTelephoneResponsable(e.target.value);
+                    setErreurFormulaire("");
+                  }}
+                  placeholder="Numéro de téléphone"
+                  className={CLASSE_INPUT}
+                />
+              </div>
 
-              <button
-                type="submit"
-                disabled={enregistrement}
-                className="rounded-lg bg-gradient-to-r from-[#8C6A1E] via-[#B38528] to-[#C6A04A] px-5 py-2.5 text-sm font-medium text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {enregistrement ? "Enregistrement..." : "Enregistrer"}
-              </button>
-            </div>
-          </form>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                  E-mail du responsable (facultatif)
+                </label>
+                <input
+                  type="email"
+                  maxLength={150}
+                  value={emailResponsable}
+                  onChange={(e) => {
+                    setEmailResponsable(e.target.value);
+                    setErreurFormulaire("");
+                  }}
+                  placeholder="Adresse e-mail"
+                  className={CLASSE_INPUT}
+                />
+              </div>
+
+              {erreurFormulaire && (
+                <div
+                  role="alert"
+                  className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 md:col-span-2"
+                >
+                  {erreurFormulaire}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 md:col-span-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAfficherFormulaire(false);
+                    setErreurFormulaire("");
+                  }}
+                  className="rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Annuler
+                </button>
+
+                <button
+                  type="submit"
+                  
+                  disabled={enregistrement}
+                  className="rounded-lg bg-gradient-to-r from-[#8C6A1E] via-[#B38528] to-[#C6A04A] px-5 py-2.5 text-sm font-medium text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {enregistrement ? "Enregistrement..." : "Enregistrer"}
+                </button>
+              </div>
+            </form>
+          </section>
         </div>
       )}
 
@@ -1849,8 +1878,7 @@ export default function DossiersPage() {
             rechercheActive={!!recherche.trim()}
             onDetails={ouvrirDetails}
             onRenvoyer={renvoyerDossier}
-            onCommencerTraitement={commencerTraitement}
-            onValider={demanderValidation}
+            onViser={demanderVisa}
             onRejeter={demanderRejet}
             onRemettreResponsable={demanderRemiseResponsable}
           />
@@ -2018,7 +2046,7 @@ export default function DossiersPage() {
         </div>
       )}
 
-      {dossierAValider && (
+      {dossierAViser && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/40 p-4">
           <div
             role="dialog"
@@ -2026,25 +2054,25 @@ export default function DossiersPage() {
             className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
           >
             <h2 className="text-lg font-semibold text-slate-900">
-              Valider le dossier ?
+              Viser le dossier ?
             </h2>
 
             <p className="mt-2 text-sm text-slate-600">
-              Vous êtes sur le point de valider le dossier{" "}
+              Vous êtes sur le point de viser le dossier{" "}
               <span className="font-semibold">
-                {dossierAValider.referenceDossier}
+                {dossierAViser.referenceDossier}
               </span>
               .
             </p>
 
             <p className="mt-3 text-sm text-slate-600">
-              Cette action enregistrera le dossier comme validé.
+              Cette action enregistrera le dossier comme visé.
             </p>
 
             <div className="mt-6 flex justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setDossierAValider(null)}
+                onClick={() => setDossierAViser(null)}
                 className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
               >
                 Annuler
@@ -2053,10 +2081,10 @@ export default function DossiersPage() {
               <button
                 type="button"
                 disabled={decisionEnCours}
-                onClick={() => void confirmerValidation()}
+                onClick={() => void confirmerVisa()}
                 className="rounded-lg bg-[#8C6A1E] px-4 py-2 text-sm font-medium text-white hover:bg-[#755817] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {decisionEnCours ? "Validation en cours..." : "Valider"}
+                {decisionEnCours ? "Visa en cours..." : "Viser"}
               </button>
             </div>
           </div>

@@ -113,17 +113,25 @@ function nomDestination(destination: string | null | undefined) {
   return NOMS_ROLES[destination] ?? destination;
 }
 
+function normaliserStatutAffichage(statut: string | null | undefined) {
+  if (!statut) return "—";
+
+  const statuts: Record<string, string> = {
+    Validé: "Visé",
+  };
+
+  return statuts[statut] ?? statut;
+}
+
 function couleurStatut(statut: string) {
-  if (statut === "Validé" || statut === "Remis") {
+  const statutNormalise = normaliserStatutAffichage(statut);
+
+  if (statutNormalise === "Visé" || statutNormalise === "Remis") {
     return "bg-emerald-50 text-emerald-700";
   }
 
-  if (statut === "Rejeté") {
+  if (statutNormalise === "Rejeté") {
     return "bg-red-50 text-red-700";
-  }
-
-  if (statut === "En cours de traitement") {
-    return "bg-amber-50 text-[#705212]";
   }
 
   return "bg-slate-100 text-slate-700";
@@ -181,8 +189,7 @@ function obtenirDossiersIndividuels(
 function obtenirStatutsBE(dossiers: DossierDansBE[]) {
   const ordre = [
     "En attente",
-    "En cours de traitement",
-    "Validé",
+    "Visé",
     "Rejeté",
     "Remis",
   ];
@@ -238,11 +245,7 @@ function creerStatistiques(role: string, donnees: DossierAPI[]): Statistique[] {
 
   const enAttente = dossiers.filter((d) => d.statutDossier === "En attente");
 
-  const enCours = dossiers.filter(
-    (d) => d.statutDossier === "En cours de traitement",
-  );
-
-  const valides = dossiers.filter((d) => d.statutDossier === "Validé");
+  const vises = dossiers.filter((d) => d.statutDossier === "Visé");
 
   const rejetes = dossiers.filter((d) => d.statutDossier === "Rejeté");
 
@@ -319,15 +322,9 @@ function creerStatistiques(role: string, donnees: DossierAPI[]): Statistique[] {
         couleur: "bg-[#F7E9B4] text-[#705212]",
       },
       {
-        titre: "En cours",
-        valeur: enCours.length,
-        detail: "Dossiers en cours de traitement",
-        couleur: "bg-amber-50 text-amber-700",
-      },
-      {
         titre: "Dossiers traités",
-        valeur: valides.length + rejetes.length,
-        detail: "Dossiers validés ou rejetés",
+        valeur: vises.length + rejetes.length,
+        detail: "Dossiers visés ou rejetés",
         couleur: "bg-emerald-50 text-emerald-700",
       },
     ];
@@ -348,15 +345,9 @@ function creerStatistiques(role: string, donnees: DossierAPI[]): Statistique[] {
         couleur: "bg-orange-50 text-orange-700",
       },
       {
-        titre: "En cours",
-        valeur: enCours.length,
-        detail: "Dossiers en cours de traitement",
-        couleur: "bg-amber-50 text-amber-700",
-      },
-      {
-        titre: "Validés",
-        valeur: valides.length,
-        detail: "Dossiers validés",
+        titre: "Visés",
+        valeur: vises.length,
+        detail: "Dossiers visés",
         couleur: "bg-emerald-50 text-emerald-700",
       },
       {
@@ -646,8 +637,11 @@ export default function DashboardPage() {
                   }
 
                   const dossier = element;
-                  const statut = dossier.statutDossier;
-                  const nomAgent =
+                  const statut = normaliserStatutAffichage(dossier.statutDossier);                  const enSouffrance =
+                    statut === "En attente" &&
+                    dossier.dateEnvoi &&
+                    Date.now() - new Date(dossier.dateEnvoi).getTime() >=
+                      5 * 24 * 60 * 60 * 1000;                  const nomAgent =
                     dossier.nomCompletAgent ??
                     obtenirNomAgents(dossier.agents ?? []);
                   const imAgent =
@@ -688,8 +682,15 @@ export default function DashboardPage() {
 
                       <td className="px-5 py-4">
                         <span
-                          className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${couleurStatut(statut)}`}
+                          className={`inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-semibold shadow-sm transition-all duration-200 ${
+                            enSouffrance
+                              ? "animate-[pulse_1.2s_ease-in-out_infinite] border-red-300 bg-red-100 text-red-800 ring-4 ring-red-200/70"
+                              : "border-transparent bg-slate-100 text-slate-700"
+                          }`}
                         >
+                          {enSouffrance && (
+                            <span className="inline-block h-2.5 w-2.5 rounded-full bg-red-600" />
+                          )}
                           {statut}
                         </span>
                       </td>

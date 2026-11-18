@@ -32,6 +32,16 @@ function nomDestination(destination: string | null) {
   return destinations[destination] ?? destination;
 }
 
+function normaliserStatutAffichage(statut: string | null | undefined) {
+  if (!statut) return "—";
+
+  const statuts: Record<string, string> = {
+    Validé: "Visé",
+  };
+
+  return statuts[statut] ?? statut;
+}
+
 export default function DossierDetailsModal({
   dossier,
   agentsDetails,
@@ -95,7 +105,7 @@ export default function DossierDetailsModal({
           <div>
             <p className="text-xs text-slate-500">Etat des dossiers</p>
             <p className="mt-1 text-sm font-medium text-[#705212]">
-              {dossier.statutDossier || "—"}
+              {normaliserStatutAffichage(dossier.statutDossier)}
             </p>
           </div>
 
@@ -196,7 +206,7 @@ export default function DossierDetailsModal({
                           </span>
 
                           <span className="ml-2 text-xs font-medium text-[#8C6A1E]">
-                            {dossierAgent?.statutDossier || "—"}
+                            {normaliserStatutAffichage(dossierAgent?.statutDossier)}
                           </span>
                         </span>
 

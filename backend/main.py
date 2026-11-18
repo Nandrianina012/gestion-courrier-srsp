@@ -2,8 +2,8 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Body
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, or_, text
-from datetime import datetime
+from sqlalchemy import String, cast, func, or_, text
+from datetime import datetime, timezone
 
 from database import Base, engine
 from models import (
@@ -61,7 +61,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000","http://127.0.0.1:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -694,6 +694,194 @@ def obtenir_dossiers(
         reverse=True,
     )
 
+#========================
+#HISTORIQUE
+#========================
+@app.get("/api/historique")
+def rechercher_historique(
+    recherche: str = Query(..., min_length=2, max_length=150),
+    utilisateur: Utilisateur = Depends(
+        exiger_roles(*ROLES_AUTORISES)
+    ),
+    db: Session = Depends(obtenir_session_db),
+):
+    terme = recherche.strip()
+
+    if len(terme) < 2:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Saisissez au moins deux caractères.",
+        )
+
+    motif = f"%{terme}%"
+
+    filtre_recherche = or_(
+        Dossier.referenceDossier.ilike(motif),
+        cast(Dossier.numeroBE, String).ilike(motif),
+        Dossier.agents.any(
+            DossierAgent.agent.has(
+                or_(
+                    Agent.IM.ilike(motif),
+                    Agent.nom.ilike(motif),
+                    Agent.prenoms.ilike(motif),
+                    func.concat(
+                        Agent.nom,
+                        " ",
+                        func.coalesce(Agent.prenoms, ""),
+                    ).ilike(motif),
+                )
+            )
+        ),
+    )
+
+    requete = db.query(Dossier).filter(filtre_recherche)
+
+    if utilisateur.role.startswith("DIVISION_"):
+        requete = requete.filter(
+            or_(
+                Dossier.localisationActuelle == utilisateur.role,
+                Dossier.transmissions.any(
+                    or_(
+                        Transmission.origine == utilisateur.role,
+                        Transmission.destination == utilisateur.role,
+                    )
+                ),
+                Dossier.actions.any(
+                    ActionDossier.roleActeur == utilisateur.role
+                ),
+            )
+        )
+
+    total = requete.count()
+
+    resultats = (
+        requete.options(
+            joinedload(Dossier.agents).joinedload(DossierAgent.agent),
+            joinedload(Dossier.be),
+            joinedload(Dossier.actions),
+            joinedload(Dossier.transmissions),
+        )
+        .order_by(Dossier.dateReception.desc(), Dossier.idDossier.desc())
+        .limit(100)
+        .all()
+    )
+
+    def date_iso(valeur):
+        return valeur.isoformat() if valeur else None
+
+    def date_tri(valeur):
+        if valeur is None:
+            return 0
+
+        if valeur.tzinfo is None:
+            valeur = valeur.replace(tzinfo=timezone.utc)
+
+        return valeur.timestamp()
+
+    dossiers_formates = []
+
+    def est_evenement_historiquement_inutile(evenement):
+        if evenement.get("type") == "transmission":
+            details = (evenement.get("details") or "").strip()
+
+            if (
+                evenement.get("titre") == "Transmission"
+                and evenement.get("destination") == "SecSRSP"
+                and details == "Renvoyé à la SecSRSP pour réorientation."
+            ):
+                return True
+
+            return (
+                evenement.get("titre") == "Transmission"
+                and evenement.get("acteur") == "SecDRBF"
+                and evenement.get("destination") == "SecSRSP"
+                and evenement.get("statut") == "En attente"
+            )
+
+        if evenement.get("type") == "action":
+            return (
+                evenement.get("titre") == "Transférer"
+                and evenement.get("statut") == "Succès"
+                and evenement.get("details") == "Transfert sans observation."
+            )
+
+        return False
+
+    for dossier in resultats:
+        chronologie = []
+
+        for action in dossier.actions:
+            evenement = {
+                "_tri": date_tri(action.dateAction),
+                "type": "action",
+                "date": date_iso(action.dateAction),
+                "titre": action.action,
+                "acteur": action.roleActeur,
+                "statut": action.resultat,
+                "details": action.observation,
+            }
+
+            if not est_evenement_historiquement_inutile(evenement):
+                chronologie.append(evenement)
+
+        for transmission in dossier.transmissions:
+            evenement = {
+                "_tri": date_tri(transmission.dateEnvoi),
+                "type": "transmission",
+                "date": date_iso(transmission.dateEnvoi),
+                "dateReception": date_iso(transmission.dateReception),
+                "titre": "Transmission",
+                "acteur": transmission.origine,
+                "destination": transmission.destination,
+                "statut": transmission.statut,
+                "details": transmission.informationsComplementaires,
+            }
+
+            if not est_evenement_historiquement_inutile(evenement):
+                chronologie.append(evenement)
+
+        chronologie.sort(key=lambda evenement: evenement["_tri"])
+
+        for evenement in chronologie:
+            evenement.pop("_tri", None)
+
+        agents = [
+            formater_agent(lien.agent)
+            for lien in dossier.agents
+            if lien.agent is not None
+        ]
+
+        dossiers_formates.append(
+            {
+                "idDossier": dossier.idDossier,
+                "numeroBE": dossier.numeroBE,
+                "referenceDossier": dossier.referenceDossier,
+                "objet": dossier.objet,
+                "dateReception": date_iso(dossier.dateReception),
+                "statut": dossier.statut,
+                "localisationActuelle": dossier.localisationActuelle,
+                "agents": agents,
+                "responsable": (
+                    {
+                        "nom": dossier.be.nomResponsable,
+                        "telephone": dossier.be.telephoneResponsable,
+                        "email": dossier.be.emailResponsable,
+                    }
+                    if dossier.be
+                    else None
+                ),
+                "chronologie": chronologie,
+            }
+        )
+
+    return {
+        "recherche": terme,
+        "total": total,
+        "limite": 100,
+        "resultatsTronques": total > 100,
+        "dossiers": dossiers_formates,
+    }
+
 # ============================================================
 # CREATION D'UN BE PAR LA SECDRBF
 # ============================================================
@@ -1315,12 +1503,13 @@ def renvoyer_dossier_sec_srsp(
         )
 
 
+
 # ============================================================
-# COMMENCER LE TRAITEMENT D'UN DOSSIER PAR UNE DIVISION
+# VISER UN DOSSIER PAR UNE DIVISION
 # ============================================================
 
-@app.post("/api/dossiers/{id_dossier}/commencer-traitement")
-def commencer_traitement(
+@app.post("/api/dossiers/{id_dossier}/viser")
+def viser_dossier(
     id_dossier: int,
     utilisateur: Utilisateur = Depends(
         exiger_roles(
@@ -1362,131 +1551,14 @@ def commencer_traitement(
             )
 
         # --------------------------------------------------------
-        # 3. Le traitement ne peut commencer que si le dossier
-        #    est encore "En attente".
+        # 3. Le dossier doit être en attente.
         # --------------------------------------------------------
         if dossier.statut != "En attente":
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=(
-                    f"Le dossier est actuellement "
-                    f"« {dossier.statut} ». "
-                    "Le traitement ne peut pas être commencé."
-                ),
-            )
-
-        # --------------------------------------------------------
-        # 4. Changer le statut.
-        #
-        #    La localisation ne change pas :
-        #    le dossier reste dans la division actuelle.
-        # --------------------------------------------------------
-        dossier.statut = "En cours de traitement"
-
-        # --------------------------------------------------------
-        # 5. Enregistrer l'action dans l'historique.
-        # --------------------------------------------------------
-        db.add(
-            ActionDossier(
-                idDossier=dossier.idDossier,
-                roleActeur=utilisateur.role,
-                action="Commencer le traitement",
-                resultat="Succès",
-                observation=(
-                    "Le traitement du dossier a été commencé."
-                ),
-            )
-        )
-
-        # --------------------------------------------------------
-        # 6. Enregistrer les modifications.
-        # --------------------------------------------------------
-        db.commit()
-
-        return {
-            "message": "Le traitement du dossier a commencé.",
-            "idDossier": dossier.idDossier,
-            "statutDossier": dossier.statut,
-            "localisationActuelle": dossier.localisationActuelle,
-        }
-
-    except HTTPException:
-        db.rollback()
-        raise
-
-    except Exception:
-        db.rollback()
-
-        logger.exception(
-            "Erreur lors du démarrage du traitement du dossier"
-        )
-
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=(
-                "Une erreur est survenue lors du démarrage "
-                "du traitement. Aucune modification n'a été enregistrée."
-            ),
-        )
-
-
-# ============================================================
-# VALIDER UN DOSSIER PAR UNE DIVISION
-# ============================================================
-
-@app.post("/api/dossiers/{id_dossier}/valider")
-def valider_dossier(
-    id_dossier: int,
-    utilisateur: Utilisateur = Depends(
-        exiger_roles(
-            "DIVISION_SOLDE",
-            "DIVISION_VISA",
-            "DIVISION_PENSIONS",
-            "DIVISION_SECOURS",
-        )
-    ),
-    db: Session = Depends(obtenir_session_db),
-):
-    try:
-        # --------------------------------------------------------
-        # 1. Trouver le dossier.
-        # --------------------------------------------------------
-        dossier = (
-            db.query(Dossier)
-            .filter(Dossier.idDossier == id_dossier)
-            .with_for_update()
-            .first()
-        )
-
-        if dossier is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Dossier introuvable.",
-            )
-
-        # --------------------------------------------------------
-        # 2. Vérifier que le dossier se trouve bien
-        #    dans la division de l'utilisateur connecté.
-        # --------------------------------------------------------
-        if dossier.localisationActuelle != utilisateur.role:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=(
-                    "Ce dossier ne se trouve pas dans votre division."
-                ),
-            )
-
-        # --------------------------------------------------------
-        # 3. Le dossier doit être en cours de traitement.
-        # --------------------------------------------------------
-        if dossier.statut != "En cours de traitement":
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=(
-                    f"Le dossier est actuellement "
-                    f"« {dossier.statut} ». "
-                    "Il ne peut être validé que lorsqu'il "
-                    "est en cours de traitement."
+                    f"Le dossier est actuellement « {dossier.statut} ». "
+                    "Il ne peut être visé que lorsqu'il est en attente."
                 ),
             )
 
@@ -1496,7 +1568,7 @@ def valider_dossier(
         #    La localisation ne change pas :
         #    le dossier reste dans la division actuelle.
         # --------------------------------------------------------
-        dossier.statut = "Validé"
+        dossier.statut = "Visé"
 
         # --------------------------------------------------------
         # 5. Enregistrer l'action dans l'historique.
@@ -1505,10 +1577,10 @@ def valider_dossier(
             ActionDossier(
                 idDossier=dossier.idDossier,
                 roleActeur=utilisateur.role,
-                action="Valider",
+                action="Viser",
                 resultat="Succès",
                 observation=(
-                    "Le dossier a été validé par la division."
+                    "Le dossier a été visé par la division."
                 ),
             )
         )
@@ -1519,7 +1591,7 @@ def valider_dossier(
         db.commit()
 
         return {
-            "message": "Le dossier a été validé avec succès.",
+            "message": "Le dossier a été visé avec succès.",
             "idDossier": dossier.idDossier,
             "statutDossier": dossier.statut,
             "localisationActuelle": dossier.localisationActuelle,
@@ -1533,14 +1605,14 @@ def valider_dossier(
         db.rollback()
 
         logger.exception(
-            "Erreur lors de la validation du dossier"
+            "Erreur lors de la visa du dossier"
         )
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=(
-                "Une erreur est survenue lors de la validation "
-                "du dossier. Aucune modification n'a été enregistrée."
+                "Une erreur est survenue"
+                ". Aucune modification n'a été enregistrée."
             ),
         )    
     
@@ -1604,14 +1676,12 @@ def rejeter_dossier(
         # --------------------------------------------------------
         # 4. Le dossier doit être en cours de traitement.
         # --------------------------------------------------------
-        if dossier.statut != "En cours de traitement":
+        if dossier.statut != "En attente":
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=(
-                    f"Le dossier est actuellement "
-                    f"« {dossier.statut} ». "
-                    "Il ne peut être rejeté que lorsqu'il "
-                    "est en cours de traitement."
+                    f"Le dossier est actuellement « {dossier.statut} ». "
+                    "Il ne peut être rejeté que lorsqu'il est en attente."
                 ),
             )
 
@@ -1716,14 +1786,14 @@ def remettre_dossier_responsable(
         # 3. La remise est possible uniquement après
         #    validation ou rejet.
         # --------------------------------------------------------
-        if dossier.statut not in ("Validé", "Rejeté"):
+        if dossier.statut not in ("Visé", "Rejeté"):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=(
                     f"Le dossier est actuellement "
                     f"« {dossier.statut} ». "
                     "Il ne peut être remis au responsable "
-                    "que lorsqu'il est validé ou rejeté."
+                    "que lorsqu'il est visé ou rejeté."
                 ),
             )
 

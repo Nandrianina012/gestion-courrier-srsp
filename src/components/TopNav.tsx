@@ -219,8 +219,8 @@ useEffect(() => {
         {/* Logo et identité */}
         <Link href="/" className="flex shrink-0 items-center gap-3">
           <Image
-            src="/logoDRGFVatovavy.jpg"
-            alt="Logo DRGF Vatovavy"
+            src="/logoDRBFVatovavy.jpg"
+            alt="Logo DRBF Vatovavy"
             width={52}
             height={52}
             priority

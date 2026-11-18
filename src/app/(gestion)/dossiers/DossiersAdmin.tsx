@@ -15,16 +15,14 @@ type Props = {
 type StatutFiltre =
   | "tous"
   | "En attente"
-  | "En cours de traitement"
-  | "Validé"
+  | "Visé"
   | "Rejeté"
   | "Remis";
 
 const STATUTS: StatutFiltre[] = [
   "tous",
   "En attente",
-  "En cours de traitement",
-  "Validé",
+  "Visé",
   "Rejeté",
   "Remis",
 ];

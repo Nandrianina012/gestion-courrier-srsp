@@ -1,12 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import type { ReactNode } from "react";
 import type { Dossier } from "./page";
+import MenuActionsPortail from "./MenuActionsPortail";
 
 type Props = {
   dossiers: Dossier[];
   chargement: boolean;
   rechercheActive: boolean;
+  filtrePeriode: ReactNode;
   onDetails: (dossier: Dossier) => void;
   onRenvoyer: (dossier: Dossier) => void;
   onViser: (dossier: Dossier) => void;
@@ -55,6 +58,7 @@ export default function DossiersDivision({
   dossiers,
   chargement,
   rechercheActive,
+  filtrePeriode,
   onDetails,
   onRenvoyer,
   onViser,
@@ -62,6 +66,7 @@ export default function DossiersDivision({
   onRemettreResponsable,
 }: Props) {
   const [menuOuvert, setMenuOuvert] = useState<number | null>(null);
+  const [ancreMenu, setAncreMenu] = useState<HTMLButtonElement | null>(null);
   const [statut, setStatut] = useState<StatutFiltre>("En attente");
   const [ordreBEDesc, setOrdreBEDesc] = useState(true);
 
@@ -85,26 +90,30 @@ export default function DossiersDivision({
 
   return (
     <div className="mt-5">
-      <div className="mb-4">
-        <label
-          htmlFor="filtre-statut-division"
-          className="mb-1.5 block text-sm font-medium text-slate-700"
-        >
-          Statut
-        </label>
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <label
+            htmlFor="filtre-statut-division"
+            className="mb-1.5 block text-sm font-medium text-slate-700"
+          >
+            Statut
+          </label>
 
-        <select
-          id="filtre-statut-division"
-          value={statut}
-          onChange={(e) => setStatut(e.target.value as StatutFiltre)}
-          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#B38528] focus:ring-1 focus:ring-[#B38528] sm:max-w-[260px]"
-        >
-          <option value="tous">Tous les dossiers</option>
-          <option value="En attente">En attente</option>
-          <option value="Visé">Visé(s)</option>
-          <option value="Rejeté">Rejeté(s)</option>
-          <option value="Remis">Remis</option>
-        </select>
+          <select
+            id="filtre-statut-division"
+            value={statut}
+            onChange={(e) => setStatut(e.target.value as StatutFiltre)}
+            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#B38528] focus:ring-1 focus:ring-[#B38528] sm:min-w-[260px]"
+          >
+            <option value="tous">Tous les dossiers</option>
+            <option value="En attente">En attente</option>
+            <option value="Visé">Visé(s)</option>
+            <option value="Rejeté">Rejeté(s)</option>
+            <option value="Remis">Remis</option>
+          </select>
+        </div>
+
+        {filtrePeriode}
       </div>
 
       <div className="overflow-x-auto">
@@ -211,18 +220,26 @@ export default function DossiersDivision({
                           type="button"
                           aria-label="Ouvrir les actions du dossier"
                           aria-expanded={menuOuvert === dossier.id}
-                          onClick={() =>
-                            setMenuOuvert(
-                              menuOuvert === dossier.id ? null : dossier.id,
-                            )
-                          }
+                          onClick={(evenement) => {
+                            if (menuOuvert === dossier.id) {
+                              setMenuOuvert(null);
+                              setAncreMenu(null);
+                            } else {
+                              setMenuOuvert(dossier.id);
+                              setAncreMenu(evenement.currentTarget);
+                            }
+                          }}
                           className="rounded-lg px-3 py-1.5 text-xl font-bold text-slate-600 hover:bg-amber-50 hover:text-[#8C6A1E]"
                         >
                           ⋮
                         </button>
 
                         {menuOuvert === dossier.id && (
-                          <div className="absolute right-4 top-10 z-30 w-56 rounded-lg border border-slate-200 bg-white py-1 text-left shadow-lg">
+                          <MenuActionsPortail
+                            ancre={ancreMenu}
+                            largeur="w-56"
+                            onFermer={() => setMenuOuvert(null)}
+                          >
                             <button
                               type="button"
                               onClick={() => {
@@ -325,7 +342,7 @@ export default function DossiersDivision({
                             >
                               Remettre au responsable
                             </button>
-                          </div>
+                          </MenuActionsPortail>
                         )}
                       </div>
                     </td>

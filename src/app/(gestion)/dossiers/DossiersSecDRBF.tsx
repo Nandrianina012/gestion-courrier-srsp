@@ -1,12 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import type { Dossier } from "./page";
+import MenuActionsPortail from "./MenuActionsPortail";
 
 type Props = {
   dossiers: Dossier[];
   chargement: boolean;
   rechercheActive: boolean;
+  filtrePeriode: ReactNode;
   onDetails: (dossier: Dossier) => void;
 };
 
@@ -93,9 +96,11 @@ export default function DossiersSecDRBF({
   dossiers,
   chargement,
   rechercheActive,
+  filtrePeriode,
   onDetails,
 }: Props) {
   const [menuOuvert, setMenuOuvert] = useState<number | null>(null);
+  const [ancreMenu, setAncreMenu] = useState<HTMLButtonElement | null>(null);
   const [situation, setSituation] = useState<SituationFiltre>("enregistres");
   const [statut, setStatut] = useState<StatutFiltre>("tous");
   const [ordreBEDesc, setOrdreBEDesc] = useState(true);
@@ -122,7 +127,8 @@ export default function DossiersSecDRBF({
 
   return (
     <div className="mt-5">
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
+        <div className="flex flex-wrap items-end gap-3">
         <div>
           <label
             htmlFor="filtre-situation-drbf"
@@ -165,6 +171,9 @@ export default function DossiersSecDRBF({
             <option value="Remis">Remis</option>
           </select>
         </div>
+        </div>
+
+        {filtrePeriode}
       </div>
 
       <div className="overflow-x-auto">
@@ -280,18 +289,26 @@ export default function DossiersSecDRBF({
                           type="button"
                           aria-label="Ouvrir les actions du dossier"
                           aria-expanded={menuOuvert === dossier.id}
-                          onClick={() =>
-                            setMenuOuvert(
-                              menuOuvert === dossier.id ? null : dossier.id,
-                            )
-                          }
+                          onClick={(evenement) => {
+                            if (menuOuvert === dossier.id) {
+                              setMenuOuvert(null);
+                              setAncreMenu(null);
+                            } else {
+                              setMenuOuvert(dossier.id);
+                              setAncreMenu(evenement.currentTarget);
+                            }
+                          }}
                           className="rounded-lg px-3 py-1.5 text-xl font-bold text-slate-600 hover:bg-amber-50 hover:text-[#8C6A1E]"
                         >
                           ⋮
                         </button>
 
                         {menuOuvert === dossier.id && (
-                          <div className="absolute right-4 top-10 z-30 w-48 rounded-lg border border-slate-200 bg-white py-1 text-left shadow-lg">
+                          <MenuActionsPortail
+                            ancre={ancreMenu}
+                            largeur="w-48"
+                            onFermer={() => setMenuOuvert(null)}
+                          >
                             <button
                               type="button"
                               onClick={() => {
@@ -311,7 +328,7 @@ export default function DossiersSecDRBF({
                             >
                               Modifier
                             </button>
-                          </div>
+                          </MenuActionsPortail>
                         )}
                       </div>
                     </td>

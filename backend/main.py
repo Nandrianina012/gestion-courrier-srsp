@@ -1,15 +1,18 @@
 
-from fastapi import FastAPI, Depends, HTTPException, status, Body
+from fastapi import FastAPI, Depends, HTTPException, status, Body, Header
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import String, cast, func, or_, text
 from datetime import datetime, timezone
+from datetime import timedelta
+from uuid import UUID
 
 from database import Base, engine
 from models import (
     Utilisateur,
     Agent,
     BE,
+    NumeroBEReserve,
     Dossier,
     DossierAgent,
     Transmission,
@@ -85,11 +88,12 @@ CLE_VERROU_NUMEROTATION_BE = 847261
 # ============================================================
 
 def prochain_numero_be(db: Session) -> int:
-    dernier_numero = db.query(
-        func.max(BE.numeroBE)
-    ).scalar()
+    dernier_numero_enregistre = db.query(func.max(BE.numeroBE)).scalar() or 0
+    dernier_numero_reserve = (
+        db.query(func.max(NumeroBEReserve.numeroBE)).scalar() or 0
+    )
 
-    return (dernier_numero or 0) + 1
+    return max(dernier_numero_enregistre, dernier_numero_reserve) + 1
 
 
 def formater_agent(agent: Agent) -> dict:
@@ -439,6 +443,53 @@ def obtenir_prochain_numero_be(
     return {
         "numeroBE": prochain_numero_be(db)
     }
+
+
+@app.post("/api/dossiers/reserver-numero-be")
+def reserver_numero_be(
+    cle_reservation: UUID = Header(..., alias="Idempotency-Key"),
+    utilisateur: Utilisateur = Depends(
+        exiger_roles(
+            "DIVISION_SOLDE",
+            "DIVISION_VISA",
+            "DIVISION_PENSIONS",
+            "DIVISION_SECOURS",
+        )
+    ),
+    db: Session = Depends(obtenir_session_db),
+):
+    try:
+        db.execute(
+            text("SELECT pg_advisory_xact_lock(:cle)"),
+            {"cle": CLE_VERROU_NUMEROTATION_BE},
+        )
+
+        reservation_existante = (
+            db.query(NumeroBEReserve)
+            .filter(NumeroBEReserve.cleReservation == str(cle_reservation))
+            .first()
+        )
+
+        if reservation_existante:
+            return {"numeroBE": reservation_existante.numeroBE}
+
+        numero_be = prochain_numero_be(db)
+        db.add(
+            NumeroBEReserve(
+                numeroBE=numero_be,
+                cleReservation=str(cle_reservation),
+            )
+        )
+        db.commit()
+
+        return {"numeroBE": numero_be}
+    except Exception:
+        db.rollback()
+        logger.exception("Erreur lors de la réservation du numéro de BE.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Impossible de réserver un numéro de BE.",
+        )
 
 
 # ============================
@@ -880,6 +931,85 @@ def rechercher_historique(
         "limite": 100,
         "resultatsTronques": total > 100,
         "dossiers": dossiers_formates,
+    }
+
+
+@app.get("/api/admin/statistiques-traitement")
+def statistiques_traitement_admin(
+    mois: str | None = Query(None, pattern=r"^\d{4}-\d{2}$"),
+    utilisateur: Utilisateur = Depends(exiger_roles("ADMIN")),
+    db: Session = Depends(obtenir_session_db),
+):
+    maintenant = datetime.now(timezone.utc)
+    mois_selectionne = mois or maintenant.strftime("%Y-%m")
+    annee, numero_mois = (int(partie) for partie in mois_selectionne.split("-"))
+    debut_mois = datetime(annee, numero_mois, 1, tzinfo=timezone.utc)
+    index_mois_suivant = annee * 12 + numero_mois
+    annee_suivante, mois_suivant_indexe = divmod(index_mois_suivant, 12)
+    debut_mois_suivant = datetime(
+        annee_suivante,
+        mois_suivant_indexe + 1,
+        1,
+        tzinfo=timezone.utc,
+    )
+
+    semaines = [
+        {
+            "semaine": numero,
+            "transferts": 0,
+            "decisions": 0,
+        }
+        for numero in range(1, 5)
+    ]
+
+    transferts = (
+        db.query(Transmission)
+        .filter(
+            Transmission.destination.in_(ROLES_AUTORISES[2:6]),
+            Transmission.dateEnvoi >= debut_mois,
+            Transmission.dateEnvoi < debut_mois_suivant,
+        )
+        .all()
+    )
+
+    for transfert in transferts:
+        date_transfert = transfert.dateEnvoi
+        if date_transfert.tzinfo is None:
+            date_transfert = date_transfert.replace(tzinfo=timezone.utc)
+        numero_semaine = min((date_transfert.day - 1) // 7 + 1, 4)
+        semaines[numero_semaine - 1]["transferts"] += 1
+
+    actions = (
+        db.query(ActionDossier)
+        .filter(
+            ActionDossier.roleActeur.in_(ROLES_AUTORISES[2:6]),
+            ActionDossier.action.in_(("Viser", "Rejeter")),
+            ActionDossier.resultat == "Succès",
+            ActionDossier.dateAction >= debut_mois,
+            ActionDossier.dateAction < debut_mois_suivant,
+        )
+        .all()
+    )
+
+    for action in actions:
+        date_action = action.dateAction
+        if date_action.tzinfo is None:
+            date_action = date_action.replace(tzinfo=timezone.utc)
+        numero_semaine = min((date_action.day - 1) // 7 + 1, 4)
+        semaines[numero_semaine - 1]["decisions"] += 1
+
+    for semaine in semaines:
+        transferts_semaine = semaine["transferts"]
+        decisions_semaine = semaine["decisions"]
+        semaine["taux"] = (
+            round(decisions_semaine / transferts_semaine * 100, 1)
+            if transferts_semaine
+            else None
+        )
+
+    return {
+        "mois": mois_selectionne,
+        "semaines": semaines,
     }
 
 # ============================================================

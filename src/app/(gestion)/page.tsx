@@ -81,6 +81,28 @@ type Statistique = {
   couleur: string;
 };
 
+type StatistiqueDivision = {
+  code: string;
+  nom: string;
+  total: number;
+  enAttente: number;
+  vises: number;
+  rejetes: number;
+  autres: number;
+};
+
+type SemaineTraitement = {
+  semaine: number;
+  transferts: number;
+  decisions: number;
+  taux: number | null;
+};
+
+type StatistiquesTraitement = {
+  mois: string;
+  semaines: SemaineTraitement[];
+};
+
 const API = "http://127.0.0.1:8000";
 
 const NOMS_ROLES: Record<string, string> = {
@@ -92,6 +114,13 @@ const NOMS_ROLES: Record<string, string> = {
   DIVISION_SECOURS: "Division SECOURS",
   ADMIN: "Administration",
 };
+
+const ROLES_DIVISIONS = [
+  "DIVISION_SOLDE",
+  "DIVISION_VISA",
+  "DIVISION_PENSIONS",
+  "DIVISION_SECOURS",
+];
 
 function estDivision(role: string) {
   return role.startsWith("DIVISION_");
@@ -186,6 +215,37 @@ function obtenirDossiersIndividuels(
   return resultat;
 }
 
+function obtenirStatistiquesDivisions(
+  donnees: DossierAPI[],
+): StatistiqueDivision[] {
+  const dossiers = obtenirDossiersIndividuels(donnees);
+
+  return ROLES_DIVISIONS.map((code) => {
+    const dossiersDivision = dossiers.filter(
+      (dossier) => dossier.localisationActuelle === code,
+    );
+    const enAttente = dossiersDivision.filter(
+      (dossier) => dossier.statutDossier === "En attente",
+    ).length;
+    const vises = dossiersDivision.filter(
+      (dossier) => normaliserStatutAffichage(dossier.statutDossier) === "Visé",
+    ).length;
+    const rejetes = dossiersDivision.filter(
+      (dossier) => normaliserStatutAffichage(dossier.statutDossier) === "Rejeté",
+    ).length;
+
+    return {
+      code,
+      nom: NOMS_ROLES[code],
+      total: dossiersDivision.length,
+      enAttente,
+      vises,
+      rejetes,
+      autres: dossiersDivision.length - enAttente - vises - rejetes,
+    };
+  });
+}
+
 function obtenirStatutsBE(dossiers: DossierDansBE[]) {
   const ordre = [
     "En attente",
@@ -245,9 +305,13 @@ function creerStatistiques(role: string, donnees: DossierAPI[]): Statistique[] {
 
   const enAttente = dossiers.filter((d) => d.statutDossier === "En attente");
 
-  const vises = dossiers.filter((d) => d.statutDossier === "Visé");
+  const vises = dossiers.filter(
+    (d) => normaliserStatutAffichage(d.statutDossier) === "Visé",
+  );
 
-  const rejetes = dossiers.filter((d) => d.statutDossier === "Rejeté");
+  const rejetes = dossiers.filter(
+    (d) => normaliserStatutAffichage(d.statutDossier) === "Rejeté",
+  );
 
   const remis = dossiers.filter((d) => d.statutDossier === "Remis");
 
@@ -322,10 +386,16 @@ function creerStatistiques(role: string, donnees: DossierAPI[]): Statistique[] {
         couleur: "bg-[#F7E9B4] text-[#705212]",
       },
       {
-        titre: "Dossiers traités",
-        valeur: vises.length + rejetes.length,
-        detail: "Dossiers visés ou rejetés",
+        titre: "Dossiers visés",
+        valeur: vises.length,
+        detail: "Dossiers visés par votre division",
         couleur: "bg-emerald-50 text-emerald-700",
+      },
+      {
+        titre: "Dossiers rejetés",
+        valeur: rejetes.length,
+        detail: "Dossiers rejetés par votre division",
+        couleur: "bg-red-50 text-red-700",
       },
     ];
   }
@@ -373,6 +443,11 @@ export default function DashboardPage() {
 
   const [utilisateur, setUtilisateur] = useState<Utilisateur | null>(null);
   const [donnees, setDonnees] = useState<DossierAPI[]>([]);
+  const [moisTraitement, setMoisTraitement] = useState("");
+  const [statistiquesTraitement, setStatistiquesTraitement] =
+    useState<StatistiquesTraitement | null>(null);
+  const [erreurTraitement, setErreurTraitement] = useState("");
+  const [chargementTraitement, setChargementTraitement] = useState(false);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState("");
 
@@ -437,6 +512,64 @@ export default function DashboardPage() {
     };
   }, [router]);
 
+  useEffect(() => {
+    if (utilisateur?.role !== "ADMIN") return;
+
+    setMoisTraitement((moisActuel) =>
+      moisActuel || new Date().toISOString().slice(0, 7),
+    );
+  }, [utilisateur?.role]);
+
+  useEffect(() => {
+    if (utilisateur?.role !== "ADMIN" || !moisTraitement) return;
+
+    let annule = false;
+    const token = sessionStorage.getItem("access_token");
+
+    if (!token) return;
+
+    async function chargerStatistiquesTraitement() {
+      setChargementTraitement(true);
+      setErreurTraitement("");
+
+      try {
+        const reponse = await fetch(
+          `${API}/api/admin/statistiques-traitement?mois=${moisTraitement}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            cache: "no-store",
+          },
+        );
+
+        const resultat: unknown = await reponse.json().catch(() => null);
+
+        if (!reponse.ok) {
+          throw new Error("Impossible de charger la tendance de traitement.");
+        }
+
+        if (!annule) {
+          setStatistiquesTraitement(resultat as StatistiquesTraitement);
+        }
+      } catch (error) {
+        if (!annule) {
+          setErreurTraitement(
+            error instanceof Error
+              ? error.message
+              : "Erreur lors du chargement des statistiques.",
+          );
+        }
+      } finally {
+        if (!annule) setChargementTraitement(false);
+      }
+    }
+
+    void chargerStatistiquesTraitement();
+
+    return () => {
+      annule = true;
+    };
+  }, [utilisateur?.role, moisTraitement]);
+
   if (chargement) {
     return (
       <div className="py-16 text-center text-slate-500">
@@ -469,6 +602,34 @@ export default function DashboardPage() {
   const nomRole = NOMS_ROLES[role] ?? role;
 
   const statistiques = creerStatistiques(role, donnees);
+  const statistiquesDivisions =
+    role === "ADMIN" ? obtenirStatistiquesDivisions(donnees) : [];
+  const semainesTraitement = statistiquesTraitement?.semaines ?? [];
+  const maximumTaux = Math.max(
+    100,
+    Math.ceil(
+      Math.max(0, ...semainesTraitement.map((semaine) => semaine.taux ?? 0)) /
+        50,
+    ) * 50,
+  );
+  const moisPrecedent = () => {
+    const [anneeMois, numeroMois] = moisTraitement.split("-").map(Number);
+    const date = new Date(Date.UTC(anneeMois, numeroMois - 2, 1));
+    setMoisTraitement(date.toISOString().slice(0, 7));
+  };
+  const moisSuivant = () => {
+    const [anneeMois, numeroMois] = moisTraitement.split("-").map(Number);
+    const date = new Date(Date.UTC(anneeMois, numeroMois, 1));
+    setMoisTraitement(date.toISOString().slice(0, 7));
+  };
+  const moisCourant = new Date().toISOString().slice(0, 7);
+  const libelleMois = moisTraitement
+    ? new Date(`${moisTraitement}-01T00:00:00Z`).toLocaleDateString("fr-FR", {
+        month: "long",
+        year: "numeric",
+        timeZone: "UTC",
+      })
+    : "";
 
   const donneesRecentes = [...donnees]
     .sort((a, b) => {
@@ -505,11 +666,7 @@ export default function DashboardPage() {
                 {statistique.titre}
               </p>
 
-              <span
-                className={`rounded-lg px-2 py-1 text-xs font-semibold ${statistique.couleur}`}
-              >
-                {role === "ADMIN" ? "Global" : nomRole}
-              </span>
+              
             </div>
 
             <p className="mt-4 text-3xl font-bold text-slate-900">
@@ -531,6 +688,241 @@ export default function DashboardPage() {
             Gérer les utilisateurs - Gérer les agents
           </p>
         </section>
+      )}
+
+      {role === "ADMIN" && (
+        <div className="grid grid-cols-1 items-stretch gap-4 xl:grid-cols-2">
+          <section
+            aria-labelledby="titre-repartition-divisions"
+            className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
+          >
+            <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2
+                id="titre-repartition-divisions"
+                className="text-lg font-bold text-slate-900"
+              >
+                Dossiers par division
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Dossiers actuellement affectés à chaque division, par statut.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-600">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-sm bg-amber-400" />
+                En attente
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-sm bg-emerald-500" />
+                Visés
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-sm bg-red-500" />
+                Rejetés
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-sm bg-slate-300" />
+                Autres
+              </span>
+            </div>
+            </div>
+
+            <div className="mt-6 space-y-5">
+            {statistiquesDivisions.map((division) => {
+              const segments = [
+                {
+                  nom: "En attente",
+                  valeur: division.enAttente,
+                  couleur: "bg-amber-400",
+                },
+                {
+                  nom: "Visés",
+                  valeur: division.vises,
+                  couleur: "bg-emerald-500",
+                },
+                {
+                  nom: "Rejetés",
+                  valeur: division.rejetes,
+                  couleur: "bg-red-500",
+                },
+                {
+                  nom: "Autres statuts",
+                  valeur: division.autres,
+                  couleur: "bg-slate-300",
+                },
+              ];
+
+              return (
+                <div
+                  key={division.code}
+                  className="grid gap-2 sm:grid-cols-[180px_minmax(0,1fr)_48px] sm:items-center sm:gap-4"
+                >
+                  <p className="text-sm font-medium text-slate-700">
+                    {division.nom}
+                  </p>
+
+                  <div
+                    role="img"
+                    aria-label={`${division.nom} : ${division.total} dossiers au total; ${division.enAttente} en attente, ${division.vises} visés, ${division.rejetes} rejetés et ${division.autres} autres.`}
+                    className="flex h-3.5 w-full overflow-hidden rounded-sm bg-slate-100"
+                  >
+                    {division.total > 0 ? (
+                      segments.map(
+                        (segment) =>
+                          segment.valeur > 0 && (
+                            <span
+                              key={segment.nom}
+                              title={`${segment.nom} : ${segment.valeur}`}
+                              className={`${segment.couleur} h-full`}
+                              style={{
+                                width: `${(segment.valeur / division.total) * 100}%`,
+                              }}
+                            />
+                          ),
+                      )
+                    ) : (
+                      <span className="h-full w-full bg-slate-100" />
+                    )}
+                  </div>
+
+                  <p className="text-right text-sm font-semibold tabular-nums text-slate-900">
+                    {division.total}
+                  </p>
+
+                  <p className="text-xs text-slate-500 sm:col-start-2">
+                    {division.enAttente} en attente · {division.vises} visé
+                    {division.vises > 1 ? "s" : ""} · {division.rejetes} rejeté
+                    {division.rejetes > 1 ? "s" : ""}
+                    {division.autres > 0 && ` · ${division.autres} autres`}
+                  </p>
+                </div>
+              );
+            })}
+            </div>
+          </section>
+
+          <section
+            aria-labelledby="titre-tendance-traitement"
+            className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2
+                  id="titre-tendance-traitement"
+                  className="text-lg font-bold text-slate-900"
+                >
+                  Taux de traitement hebdomadaire
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Toutes divisions confondues
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  aria-label="Mois précédent"
+                  disabled={!moisTraitement}
+                  onClick={moisPrecedent}
+                  className="rounded-md border border-slate-200 px-2 py-1 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                >
+                  ←
+                </button>
+                <span className="min-w-[112px] text-center text-sm font-medium capitalize text-slate-700">
+                  {libelleMois}
+                </span>
+                <button
+                  type="button"
+                  aria-label="Mois suivant"
+                  disabled={!moisTraitement || moisTraitement >= moisCourant}
+                  onClick={moisSuivant}
+                  className="rounded-md border border-slate-200 px-2 py-1 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                >
+                  →
+                </button>
+              </div>
+            </div>
+
+            <p className="mt-3 text-xs text-slate-500">
+              Décisions (visés + rejetés) ÷ dossiers transférés aux divisions.
+            </p>
+
+            {chargementTraitement ? (
+              <p className="mt-6 text-sm text-slate-500">
+                Chargement des statistiques…
+              </p>
+            ) : erreurTraitement ? (
+              <p role="alert" className="mt-6 text-sm text-red-700">
+                {erreurTraitement}
+              </p>
+            ) : (
+              <>
+                <div className="mt-5 grid grid-cols-[30px_minmax(0,1fr)] gap-x-2">
+                  <div className="flex h-36 flex-col justify-between pb-5 text-right text-[10px] tabular-nums text-slate-400">
+                    {[maximumTaux, Math.round(maximumTaux / 2), 0].map((valeur) => (
+                      <span key={valeur}>{valeur}%</span>
+                    ))}
+                  </div>
+
+                  <div className="relative h-36 border-b border-l border-slate-300">
+                    <div className="pointer-events-none absolute inset-0 flex h-[calc(100%-1.25rem)] flex-col justify-between">
+                      {[0, 1, 2].map((ligne) => (
+                        <span
+                          key={ligne}
+                          className="w-full border-t border-dashed border-slate-200"
+                        />
+                      ))}
+                    </div>
+                    <div className="relative grid h-full grid-cols-4 items-end gap-2 px-2">
+                      {semainesTraitement.map((semaine) => {
+                        const taux = semaine.taux ?? 0;
+                        const hauteur = Math.min(
+                          (taux / maximumTaux) * 100,
+                          100,
+                        );
+
+                        return (
+                          <div
+                            key={semaine.semaine}
+                            className="flex h-full flex-col items-center justify-end"
+                          >
+                            <span className="mb-1 text-[10px] font-medium tabular-nums text-slate-600">
+                              {semaine.taux === null ? "—" : `${taux}%`}
+                            </span>
+                            <div className="flex h-[calc(100%-2.25rem)] w-full items-end justify-center">
+                              <span
+                                role="img"
+                                aria-label={`Semaine ${semaine.semaine} : ${semaine.taux === null ? "aucun transfert" : `taux ${taux}%`}, ${semaine.decisions} décisions pour ${semaine.transferts} transferts`}
+                                className="w-8 max-w-full rounded-t-sm bg-emerald-500/80"
+                                style={{ height: `${hauteur}%` }}
+                              />
+                            </div>
+                            <span className="mt-1 text-[10px] text-slate-500">
+                              S{semaine.semaine}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-3 grid grid-cols-4 gap-2 pl-8 text-center text-[10px] leading-4 text-slate-500">
+                  {semainesTraitement.map((semaine) => (
+                    <span key={semaine.semaine}>
+                      {semaine.decisions}/{semaine.transferts}
+                    </span>
+                  ))}
+                </div>
+                <p className="mt-2 text-[10px] text-slate-400">
+                  Un taux supérieur à 100 % signifie que des dossiers reçus avant ce mois ont aussi été traités.
+                </p>
+              </>
+            )}
+          </section>
+        </div>
       )}
 
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">

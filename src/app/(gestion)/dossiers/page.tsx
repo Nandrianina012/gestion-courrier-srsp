@@ -8,6 +8,7 @@ import DossiersSecDRBF from "./DossiersSecDRBF";
 import DossiersSecSRSP from "./DossiersSecSRSP";
 import DossiersDivision from "./DossiersDivision";
 import DossiersAdmin from "./DossiersAdmin";
+import FiltrePeriodeDossiers from "./FiltrePeriodeDossiers";
 import DossierDetailsModal from "./DossierDetailsModal";
 import TransfertModal from "./TransfertModal";
 import CreationBEDepart from "./CreationBEDepart";
@@ -103,6 +104,8 @@ export default function DossiersPage() {
   const [utilisateur, setUtilisateur] = useState<Utilisateur | null>(null);
   const [dossiers, setDossiers] = useState<Dossier[]>([]);
   const [recherche, setRecherche] = useState("");
+  const [dateDebutRecherche, setDateDebutRecherche] = useState("");
+  const [dateFinRecherche, setDateFinRecherche] = useState("");
   const [erreur, setErreur] = useState("");
 
   // Création d'un BE.
@@ -698,6 +701,16 @@ export default function DossiersPage() {
 
   const dossiersFiltres = dossiers.filter((dossier) => {
     const terme = recherche.toLowerCase().trim();
+    const dateEnregistrement = dossier.dateReception?.slice(0, 10) ?? "";
+
+    if (
+      (dateDebutRecherche || dateFinRecherche) &&
+      (!dateEnregistrement ||
+        (dateDebutRecherche && dateEnregistrement < dateDebutRecherche) ||
+        (dateFinRecherche && dateEnregistrement > dateFinRecherche))
+    ) {
+      return false;
+    }
 
     if (!terme) return true;
 
@@ -1856,7 +1869,17 @@ export default function DossiersPage() {
           <DossiersSecDRBF
             dossiers={dossiersFiltres}
             chargement={chargementDossiers}
-            rechercheActive={!!recherche.trim()}
+            rechercheActive={
+              !!recherche.trim() || !!dateDebutRecherche || !!dateFinRecherche
+            }
+            filtrePeriode={
+              <FiltrePeriodeDossiers
+                dateDebut={dateDebutRecherche}
+                dateFin={dateFinRecherche}
+                onDateDebutChange={setDateDebutRecherche}
+                onDateFinChange={setDateFinRecherche}
+              />
+            }
             onDetails={ouvrirDetails}
           />
         )}
@@ -1865,7 +1888,17 @@ export default function DossiersPage() {
           <DossiersSecSRSP
             dossiers={dossiersFiltres}
             chargement={chargementDossiers}
-            rechercheActive={!!recherche.trim()}
+            rechercheActive={
+              !!recherche.trim() || !!dateDebutRecherche || !!dateFinRecherche
+            }
+            filtrePeriode={
+              <FiltrePeriodeDossiers
+                dateDebut={dateDebutRecherche}
+                dateFin={dateFinRecherche}
+                onDateDebutChange={setDateDebutRecherche}
+                onDateFinChange={setDateFinRecherche}
+              />
+            }
             onDetails={ouvrirDetails}
             onTransfert={ouvrirTransfert}
           />
@@ -1875,7 +1908,17 @@ export default function DossiersPage() {
           <DossiersDivision
             dossiers={dossiersFiltres}
             chargement={chargementDossiers}
-            rechercheActive={!!recherche.trim()}
+            rechercheActive={
+              !!recherche.trim() || !!dateDebutRecherche || !!dateFinRecherche
+            }
+            filtrePeriode={
+              <FiltrePeriodeDossiers
+                dateDebut={dateDebutRecherche}
+                dateFin={dateFinRecherche}
+                onDateDebutChange={setDateDebutRecherche}
+                onDateFinChange={setDateFinRecherche}
+              />
+            }
             onDetails={ouvrirDetails}
             onRenvoyer={renvoyerDossier}
             onViser={demanderVisa}
@@ -1888,7 +1931,18 @@ export default function DossiersPage() {
           <DossiersAdmin
             dossiers={dossiersFiltres}
             chargement={chargementDossiers}
-            rechercheActive={!!recherche.trim()}
+            rechercheActive={
+              !!recherche.trim() || !!dateDebutRecherche || !!dateFinRecherche
+            }
+            filtrePeriode={
+              <FiltrePeriodeDossiers
+                dateDebut={dateDebutRecherche}
+                dateFin={dateFinRecherche}
+                onDateDebutChange={setDateDebutRecherche}
+                onDateFinChange={setDateFinRecherche}
+                compact
+              />
+            }
             onDetails={ouvrirDetails}
             onTransfert={ouvrirTransfert}
           />

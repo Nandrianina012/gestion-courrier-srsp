@@ -8,6 +8,7 @@ from sqlalchemy import (
     Text,
     CheckConstraint,
     func,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 
@@ -140,6 +141,21 @@ class BE(Base):
     dossiers = relationship(
         "Dossier",
         back_populates="be",
+    )
+
+
+class NumeroBEReserve(Base):
+    __tablename__ = "numeros_be_reserves"
+    __table_args__ = (
+        UniqueConstraint("cleReservation", name="uq_numero_be_cle_reservation"),
+    )
+
+    numeroBE = Column(Integer, primary_key=True)
+    cleReservation = Column(String(36), nullable=False)
+    dateReservation = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
     )
 
 

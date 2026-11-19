@@ -1,12 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import type { ReactNode } from "react";
 import type { Dossier } from "./page";
+import MenuActionsPortail from "./MenuActionsPortail";
 
 type Props = {
   dossiers: Dossier[];
   chargement: boolean;
   rechercheActive: boolean;
+  filtrePeriode: ReactNode;
   onDetails: (dossier: Dossier) => void;
   onTransfert: (dossier: Dossier) => void;
 };
@@ -115,10 +118,12 @@ export default function DossiersSecSRSP({
   dossiers,
   chargement,
   rechercheActive,
+  filtrePeriode,
   onDetails,
   onTransfert,
 }: Props) {
   const [menuOuvert, setMenuOuvert] = useState<number | null>(null);
+  const [ancreMenu, setAncreMenu] = useState<HTMLButtonElement | null>(null);
   const [situation, setSituation] = useState<SituationFiltre>("non_transferes");
   const [statut, setStatut] = useState<StatutFiltre>("tous");
   const [ordreBEDesc, setOrdreBEDesc] = useState(true);
@@ -150,7 +155,8 @@ export default function DossiersSecSRSP({
 
   return (
     <div className="mt-5">
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
+        <div className="flex flex-wrap items-end gap-3">
         <div>
           <label
             htmlFor="filtre-situation-srsp"
@@ -195,6 +201,9 @@ export default function DossiersSecSRSP({
             <option value="Remis">Remis</option>
           </select>
         </div>
+        </div>
+
+        {filtrePeriode}
       </div>
 
       <div className="overflow-x-auto">
@@ -328,18 +337,26 @@ export default function DossiersSecSRSP({
                           type="button"
                           aria-label={`Ouvrir les actions du BE ${dossier.numeroBE}`}
                           aria-expanded={menuOuvert === idLigne}
-                          onClick={() =>
-                            setMenuOuvert(
-                              menuOuvert === idLigne ? null : idLigne,
-                            )
-                          }
+                          onClick={(evenement) => {
+                            if (menuOuvert === idLigne) {
+                              setMenuOuvert(null);
+                              setAncreMenu(null);
+                            } else {
+                              setMenuOuvert(idLigne);
+                              setAncreMenu(evenement.currentTarget);
+                            }
+                          }}
                           className="rounded-lg px-3 py-1.5 text-xl font-bold text-slate-600 hover:bg-amber-50 hover:text-[#8C6A1E]"
                         >
                           ⋮
                         </button>
 
                         {menuOuvert === idLigne && (
-                          <div className="absolute right-4 top-10 z-30 w-48 rounded-lg border border-slate-200 bg-white py-1 text-left shadow-lg">
+                          <MenuActionsPortail
+                            ancre={ancreMenu}
+                            largeur="w-48"
+                            onFermer={() => setMenuOuvert(null)}
+                          >
                             <button
                               type="button"
                               onClick={() => {
@@ -361,7 +378,7 @@ export default function DossiersSecSRSP({
                             >
                               Transmettre le BE
                             </button>
-                          </div>
+                          </MenuActionsPortail>
                         )}
                       </div>
                     </td>

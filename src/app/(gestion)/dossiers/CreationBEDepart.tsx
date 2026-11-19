@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Dossier } from "./page";
 import { objetsDossier } from "@/data/objetsDossier";
 import type { jsPDF } from "jspdf";
@@ -37,6 +37,7 @@ type Chapitre = {
 
 const CLASSE_INPUT =
   "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#B38528] focus:ring-1 focus:ring-[#B38528]";
+const API = "http://127.0.0.1:8000";
 
 const objetsDisponibles = [
   ...new Set(objetsDossier.map((element) => element.objet)),
@@ -151,7 +152,7 @@ export default function CreationBEDepart({
   const maintenant = new Date();
 
   const [annee, setAnnee] = useState(String(maintenant.getFullYear()));
-  const [numeroBE, setNumeroBE] = useState("001");
+  const [numeroBE, setNumeroBE] = useState<number | null>(null);
   const [destinataire, setDestinataire] = useState(
     "Monsieur LE CHEF DE SERVICE CENTRAL DE LA SOLDE ANTANANARIVO",
   );
@@ -184,6 +185,62 @@ export default function CreationBEDepart({
 
   const [telechargementEnCours, setTelechargementEnCours] = useState(false);
   const [erreurPDF, setErreurPDF] = useState("");
+  const [chargementNumeroBE, setChargementNumeroBE] = useState(true);
+  const cleReservationRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    let actif = true;
+    const token = sessionStorage.getItem("access_token");
+
+    if (!token) {
+      setErreurPDF("Votre session a expiré. Reconnectez-vous pour créer un BE.");
+      setChargementNumeroBE(false);
+      return () => {
+        actif = false;
+      };
+    }
+
+    cleReservationRef.current ??= crypto.randomUUID();
+
+    async function reserverNumeroBE() {
+      try {
+        const reponse = await fetch(`${API}/api/dossiers/reserver-numero-be`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Idempotency-Key": cleReservationRef.current!,
+          },
+        });
+        const resultat = await reponse.json().catch(() => null);
+
+        if (!reponse.ok || typeof resultat?.numeroBE !== "number") {
+          throw new Error(
+            typeof resultat?.detail === "string"
+              ? resultat.detail
+              : "Impossible de réserver le numéro du BE.",
+          );
+        }
+
+        if (actif) setNumeroBE(resultat.numeroBE);
+      } catch (error) {
+        if (actif) {
+          setErreurPDF(
+            error instanceof Error
+              ? error.message
+              : "Erreur lors de la réservation du numéro de BE.",
+          );
+        }
+      } finally {
+        if (actif) setChargementNumeroBE(false);
+      }
+    }
+
+    void reserverNumeroBE();
+
+    return () => {
+      actif = false;
+    };
+  }, []);
 
   const agentsDisponibles = useMemo(() => {
     const objetRecherche = objet.trim().toLocaleLowerCase();
@@ -697,7 +754,7 @@ export default function CreationBEDepart({
     }
   }
 
-  const numeroFormate = numeroBE.trim().padStart(3, "0");
+  const numeroFormate = String(numeroBE ?? "").padStart(3, "0");
 
   return (
     <div
@@ -882,8 +939,9 @@ export default function CreationBEDepart({
               </label>
               <input
                 type="text"
-                value={numeroBE}
-                onChange={(e) => setNumeroBE(e.target.value)}
+                value={numeroBE ?? ""}
+                readOnly
+                placeholder={chargementNumeroBE ? "Réservation..." : "Indisponible"}
                 className={CLASSE_INPUT}
               />
               <p className="mt-1 text-xs text-slate-500">
@@ -1363,7 +1421,13 @@ export default function CreationBEDepart({
             <button
               type="button"
               onClick={() => void telechargerBE()}
-              disabled={!objet || totalActes === 0 || telechargementEnCours}
+              disabled={
+                !objet ||
+                numeroBE === null ||
+                chargementNumeroBE ||
+                totalActes === 0 ||
+                telechargementEnCours
+              }
               className="rounded-lg bg-[#8C6A1E] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#755817] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {telechargementEnCours

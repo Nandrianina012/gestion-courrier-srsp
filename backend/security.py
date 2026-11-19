@@ -21,7 +21,7 @@ if not JWT_SECRET_KEY:
     )
 
 JWT_ALGORITHM = "HS256"
-JWT_DURATION_MINUTES = 480
+JWT_DURATION_MINUTES = 720
 
 # Prépare le système de hachage des mots de passe.
 password_hasher = PasswordHash.recommended()
@@ -36,7 +36,7 @@ def verifier_mot_de_passe(
 
 
 def creer_jeton(id_utilisateur: int, role: str) -> str:
-    """Crée un jeton JWT valable pendant 30 minutes."""
+    """Crée un jeton JWT valable pendant 12 heures."""
 
     maintenant = datetime.now(timezone.utc)
 

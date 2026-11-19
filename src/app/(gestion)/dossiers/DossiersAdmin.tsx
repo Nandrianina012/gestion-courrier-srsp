@@ -2,12 +2,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import type { Dossier } from "./page";
+import MenuActionsPortail from "./MenuActionsPortail";
 
 type Props = {
   dossiers: Dossier[];
   chargement: boolean;
   rechercheActive: boolean;
+  filtrePeriode: ReactNode;
   onDetails: (dossier: Dossier) => void;
   onTransfert: (dossier: Dossier) => void;
 };
@@ -82,10 +85,12 @@ export default function DossiersAdmin({
   dossiers,
   chargement,
   rechercheActive,
+  filtrePeriode,
   onDetails,
   onTransfert,
 }: Props) {
   const [menuOuvert, setMenuOuvert] = useState<number | null>(null);
+  const [ancreMenu, setAncreMenu] = useState<HTMLButtonElement | null>(null);
 
   const [situationFiltre, setSituationFiltre] = useState("toutes");
 
@@ -193,7 +198,7 @@ export default function DossiersAdmin({
           )}
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-end">
           <div>
             <label
               htmlFor="filtre-situation-admin"
@@ -240,6 +245,10 @@ export default function DossiersAdmin({
                 </option>
               ))}
             </select>
+          </div>
+
+          <div className="sm:col-span-2 xl:col-span-1 xl:justify-self-end">
+            {filtrePeriode}
           </div>
         </div>
       </div>
@@ -374,18 +383,26 @@ export default function DossiersAdmin({
                           type="button"
                           aria-label="Ouvrir les actions du dossier"
                           aria-expanded={menuOuvert === dossier.id}
-                          onClick={() =>
-                            setMenuOuvert(
-                              menuOuvert === dossier.id ? null : dossier.id,
-                            )
-                          }
+                          onClick={(evenement) => {
+                            if (menuOuvert === dossier.id) {
+                              setMenuOuvert(null);
+                              setAncreMenu(null);
+                            } else {
+                              setMenuOuvert(dossier.id);
+                              setAncreMenu(evenement.currentTarget);
+                            }
+                          }}
                           className="rounded-lg px-3 py-1.5 text-xl font-bold text-slate-600 hover:bg-amber-50 hover:text-[#8C6A1E]"
                         >
                           ⋮
                         </button>
 
                         {menuOuvert === dossier.id && (
-                          <div className="absolute right-4 top-10 z-30 w-48 rounded-lg border border-slate-200 bg-white py-1 text-left shadow-lg">
+                          <MenuActionsPortail
+                            ancre={ancreMenu}
+                            largeur="w-48"
+                            onFermer={() => setMenuOuvert(null)}
+                          >
                             <button
                               type="button"
                               onClick={() => {
@@ -425,7 +442,7 @@ export default function DossiersAdmin({
                             >
                               Rejeter
                             </button>
-                          </div>
+                          </MenuActionsPortail>
                         )}
                       </div>
                     </td>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { API } from "@/lib/api";
 
 type TypeImport = "en_poste" | "retraite";
 
@@ -33,8 +34,6 @@ type ImportConfirmationResponse = {
   mises_a_jour: number;
   total: number;
 };
-
-const API_BASE = "http://127.0.0.1:8000";
 
 function extraireErreur(payload: unknown): string {
   if (typeof payload === "string") {
@@ -112,7 +111,7 @@ export default function AgentsPage() {
     formData.append("fichier", fichier);
     formData.append("typeAgent", typeImport);
 
-    const reponse = await fetch(`${API_BASE}${url}?typeAgent=${typeImport}`, {
+    const reponse = await fetch(`${API}${url}?typeAgent=${typeImport}`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -209,7 +208,7 @@ export default function AgentsPage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl p-6 md:p-10">
+    <main className="mx-auto max-w-6xl p-3 sm:p-6 md:p-10">
       <div className="mb-8">
         <p className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-700">
           Administration
@@ -219,7 +218,7 @@ export default function AgentsPage() {
         </h1>
       </div>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:rounded-2xl sm:p-6">
         <div className="flex flex-wrap gap-3">
           <button
             type="button"
@@ -272,7 +271,7 @@ export default function AgentsPage() {
             />
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
             <button
               type="button"
               onClick={previsualiserImport}
@@ -360,7 +359,46 @@ export default function AgentsPage() {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="space-y-3 p-3 xl:hidden">
+            {preview.agents.map((agent, index) => (
+              <article
+                key={`${agent.IM ?? agent.numeroPension ?? "agent"}-${index}`}
+                className="rounded-lg border border-slate-200 p-3"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="break-words font-medium text-slate-900">
+                      {[agent.nom, agent.prenoms].filter(Boolean).join(" ") || "Nom non renseigné"}
+                    </p>
+                    <p className="mt-1 break-all text-xs text-slate-500">
+                      {typeImport === "en_poste" ? "IM" : "N° pension"}: {typeImport === "en_poste" ? agent.IM ?? "—" : agent.numeroPension ?? "—"}
+                    </p>
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                      agent.action === "creation"
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-amber-100 text-amber-700"
+                    }`}
+                  >
+                    {agent.action === "creation" ? "Création" : "Mise à jour"}
+                  </span>
+                </div>
+                <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <dt className="text-xs text-slate-500">CIN</dt>
+                    <dd className="break-all text-slate-700">{agent.CIN ?? "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-slate-500">Type</dt>
+                    <dd className="text-slate-700">{agent.typeAgent ?? "—"}</dd>
+                  </div>
+                </dl>
+              </article>
+            ))}
+          </div>
+
+          <div className="hidden overflow-x-auto xl:block">
             <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
               <thead className="bg-slate-50">
                 <tr>

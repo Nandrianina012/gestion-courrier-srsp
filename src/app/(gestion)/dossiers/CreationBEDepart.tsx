@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Dossier } from "./page";
 import { objetsDossier } from "@/data/objetsDossier";
+import { API } from "@/lib/api";
 import type { jsPDF } from "jspdf";
 
 type Props = {
@@ -37,8 +38,6 @@ type Chapitre = {
 
 const CLASSE_INPUT =
   "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#B38528] focus:ring-1 focus:ring-[#B38528]";
-const API = "http://127.0.0.1:8000";
-
 const objetsDisponibles = [
   ...new Set(objetsDossier.map((element) => element.objet)),
 ];
@@ -1011,17 +1010,17 @@ export default function CreationBEDepart({
             </div>
           </div>
 
-          <div className="mt-4 flex gap-4">
+          <div className="mt-4 flex flex-wrap gap-2 sm:gap-4">
             <button
               type="button"
-              className={`rounded-lg border px-3 py-2 text-sm font-medium ${modeSaisie === "chapitres" ? "border-[#B38528] text-[#705212] bg-amber-50" : "border-slate-300 text-slate-700 bg-white"}`}
+              className={`min-h-11 flex-1 rounded-lg border px-3 py-2 text-sm font-medium sm:flex-none ${modeSaisie === "chapitres" ? "border-[#B38528] text-[#705212] bg-amber-50" : "border-slate-300 text-slate-700 bg-white"}`}
               onClick={() => setModeSaisie("chapitres")}
             >
               Ajouter des chapitres
             </button>
             <button
               type="button"
-              className={`rounded-lg border px-3 py-2 text-sm font-medium ${modeSaisie === "agents" ? "border-[#B38528] text-[#705212] bg-amber-50" : "border-slate-300 text-slate-700 bg-white"}`}
+              className={`min-h-11 flex-1 rounded-lg border px-3 py-2 text-sm font-medium sm:flex-none ${modeSaisie === "agents" ? "border-[#B38528] text-[#705212] bg-amber-50" : "border-slate-300 text-slate-700 bg-white"}`}
               onClick={() => setModeSaisie("agents")}
             >
               Sans chapitre

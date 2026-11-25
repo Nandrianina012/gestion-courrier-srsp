@@ -206,7 +206,97 @@ export default function DossiersSecSRSP({
         {filtrePeriode}
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="space-y-3 xl:hidden">
+        {chargement ? (
+          <p className="py-8 text-center text-sm text-slate-500">
+            Chargement des BE...
+          </p>
+        ) : dossiersAffiches.length === 0 ? (
+          <p className="py-8 text-center text-sm text-slate-500">{messageVide}</p>
+        ) : (
+          dossiersAffiches.map((dossier) => {
+            const idLigne = dossier.idDossier ?? dossier.id;
+            const statutAffiche = resumeStatuts(dossier.dossiers ?? []);
+            const dateTransmission =
+              dossier.destination?.startsWith("DIVISION_")
+                ? formaterDate(dossier.dateEnvoi)
+                : "—";
+
+            return (
+              <article
+                key={idLigne}
+                className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-slate-500">
+                      BE n°{dossier.numeroBE}
+                    </p>
+                    <h3 className="mt-1 break-words text-sm font-semibold text-slate-900">
+                      {dossier.referenceDossier}
+                    </h3>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-[#705212]">
+                    {statutAffiche || "—"}
+                  </span>
+                </div>
+
+                <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+                  <div>
+                    <dt className="text-xs text-slate-500">Enregistré le</dt>
+                    <dd className="mt-0.5 text-slate-700">
+                      {formaterDate(dossier.dateReception)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-slate-500">Transmis le</dt>
+                    <dd className="mt-0.5 text-slate-700">{dateTransmission}</dd>
+                  </div>
+                  <div className="col-span-2">
+                    <dt className="text-xs text-slate-500">Objet</dt>
+                    <dd className="mt-0.5 break-words text-slate-800">
+                      {dossier.objet}
+                    </dd>
+                  </div>
+                  <div className="col-span-2">
+                    <dt className="text-xs text-slate-500">Agents concernés</dt>
+                    <dd className="mt-0.5 text-slate-700">
+                      {dossier.agents.map((agent) => agent.nomComplet).filter(Boolean).join(", ") || "—"}
+                    </dd>
+                  </div>
+                  {dossier.destination && (
+                    <div className="col-span-2">
+                      <dt className="text-xs text-slate-500">Localisation</dt>
+                      <dd className="mt-0.5 text-slate-700">
+                        {nomDestination(dossier.destination)}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onDetails(dossier)}
+                    className="min-h-11 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    Détails du BE
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onTransfert(dossier)}
+                    className="min-h-11 rounded-lg bg-[#8C6A1E] px-3 py-2 text-sm font-medium text-white hover:bg-[#755817]"
+                  >
+                    Transmettre
+                  </button>
+                </div>
+              </article>
+            );
+          })
+        )}
+      </div>
+
+      <div className="hidden overflow-x-auto xl:block">
         <table className="w-full min-w-[1100px] border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-slate-200 bg-amber-50 text-slate-700">

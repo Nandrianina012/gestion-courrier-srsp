@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { API } from "@/lib/api";
 
 type Utilisateur = {
   idUtilisateur: number;
@@ -102,8 +103,6 @@ type StatistiquesTraitement = {
   mois: string;
   semaines: SemaineTraitement[];
 };
-
-const API = "http://127.0.0.1:8000";
 
 const NOMS_ROLES: Record<string, string> = {
   SecDRBF: "Secrétariat DRBF",
@@ -945,7 +944,89 @@ export default function DashboardPage() {
           </Link>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="space-y-3 p-3 xl:hidden">
+          {donneesRecentes.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-500">
+              Aucun élément récent à afficher.
+            </p>
+          ) : (
+            donneesRecentes.map((element) => {
+              if (estGroupeBE(element)) {
+                const statut = obtenirStatutsBE(element.dossiers);
+
+                return (
+                  <article
+                    key={`recent-mobile-be-${element.numeroBE}`}
+                    className="rounded-lg border border-slate-200 p-3"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-slate-500">
+                          BE n°{element.numeroBE}
+                        </p>
+                        <h3 className="mt-1 break-words text-sm font-semibold text-[#705212]">
+                          {element.referenceDossier}
+                        </h3>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700">
+                        {statut || "—"}
+                      </span>
+                    </div>
+                    <p className="mt-3 break-words text-sm text-slate-800">
+                      {obtenirNomAgents(element.agents)}
+                    </p>
+                    <p className="mt-1 break-all text-xs text-slate-500">
+                      IM : {obtenirIMAgents(element.agents)}
+                    </p>
+                    <p className="mt-2 break-words text-sm text-slate-600">
+                      {element.objet}
+                    </p>
+                  </article>
+                );
+              }
+
+              const dossier = element;
+              const statut = normaliserStatutAffichage(dossier.statutDossier);
+
+              return (
+                <article
+                  key={`recent-mobile-dossier-${dossier.idDossier ?? dossier.id}`}
+                  className="rounded-lg border border-slate-200 p-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-slate-500">
+                        Dossier n°{dossier.numeroBE ?? dossier.numeroDossier ?? "—"}
+                      </p>
+                      <h3 className="mt-1 break-words text-sm font-semibold text-[#705212]">
+                        {dossier.referenceDossier}
+                      </h3>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700">
+                      {statut}
+                    </span>
+                  </div>
+                  <p className="mt-3 break-words text-sm font-medium text-slate-800">
+                    {dossier.nomCompletAgent ?? obtenirNomAgents(dossier.agents ?? [])}
+                  </p>
+                  <p className="mt-1 break-all text-xs text-slate-500">
+                    IM : {dossier.IM ?? obtenirIMAgents(dossier.agents ?? [])}
+                  </p>
+                  <p className="mt-2 break-words text-sm text-slate-600">
+                    {dossier.objet}
+                  </p>
+                  {estDivision(role) && (
+                    <p className="mt-2 text-xs text-slate-500">
+                      {nomDestination(dossier.localisationActuelle)}
+                    </p>
+                  )}
+                </article>
+              );
+            })
+          )}
+        </div>
+
+        <div className="hidden overflow-x-auto xl:block">
           <table className="w-full min-w-[800px] text-left text-sm">
             <thead className="bg-amber-50 text-slate-600">
               <tr>

@@ -63,17 +63,17 @@ export default function TransfertModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-2 sm:p-4"
       onClick={onFermer}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="titre-transfert-dossier"
-        className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-xl bg-white shadow-xl"
+        className="max-h-[calc(100dvh-1rem)] w-full max-w-4xl overflow-y-auto rounded-lg bg-white shadow-xl sm:max-h-[90vh] sm:rounded-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-4 sm:px-6">
           <div>
             <h2
               id="titre-transfert-dossier"
@@ -82,7 +82,7 @@ export default function TransfertModal({
               Transfert du BE n°{dossier.numeroBE}
             </h2>
 
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 break-words text-sm text-slate-500">
               {dossier.referenceDossier} — {dossier.objet}
             </p>
           </div>
@@ -97,7 +97,7 @@ export default function TransfertModal({
           </button>
         </div>
 
-        <div className="space-y-6 px-6 py-5">
+        <div className="space-y-6 px-4 py-5 sm:px-6">
           <div>
             <label className="mb-1.5 block text-sm font-medium text-slate-700">
               Division destinataire
@@ -141,7 +141,7 @@ export default function TransfertModal({
               return (
                 <div
                   key={agent.idAgent}
-                  className="rounded-xl border border-slate-200 bg-slate-50 p-5"
+                  className="rounded-lg border border-slate-200 bg-slate-50 p-3 sm:rounded-xl sm:p-5"
                 >
                   <div className="mb-4">
                     <h4 className="font-semibold text-slate-900">
@@ -218,14 +218,14 @@ export default function TransfertModal({
           </div>
         </div>
 
-        <div className="flex flex-col-reverse gap-3 border-t border-slate-200 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col-reverse gap-3 border-t border-slate-200 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <p className="text-xs text-slate-500">
             {destination
               ? `Destination : ${destinationLabel}`
               : "Aucune division sélectionnée"}
           </p>
 
-          <div className="flex justify-end gap-3">
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
             <button
               type="button"
               onClick={onFermer}
@@ -238,7 +238,7 @@ export default function TransfertModal({
               type="button"
               disabled={!destination}
               onClick={onConfirmer}
-              className="rounded-lg bg-gradient-to-r from-[#8C6A1E] via-[#B38528] to-[#C6A04A] px-5 py-2.5 text-sm font-medium text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg bg-gradient-to-r from-[#8C6A1E] via-[#B38528] to-[#C6A04A] px-3 py-2.5 text-sm font-medium text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50 sm:px-5"
             >
               {destination
                 ? `Transférer vers ${destinationLabel}`

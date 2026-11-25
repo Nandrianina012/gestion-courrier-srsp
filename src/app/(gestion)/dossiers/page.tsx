@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { objetsDossier } from "@/data/objetsDossier";
+import { API } from "@/lib/api";
 
 import DossiersSecDRBF from "./DossiersSecDRBF";
 import DossiersSecSRSP from "./DossiersSecSRSP";
@@ -75,8 +76,6 @@ type AgentFormulaire = {
   agentNonTrouve: boolean;
   rechercheEnCours: boolean;
 };
-
-const API = "http://127.0.0.1:8000";
 
 const objetsDisponibles = objetsDossier.map((element) => element.objet);
 

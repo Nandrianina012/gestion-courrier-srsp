@@ -2,8 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-
-const API = "http://127.0.0.1:8000";
+import { API } from "@/lib/api";
 
 type AgentHistorique = {
   idAgent: number;

@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { API } from "@/lib/api";
 
 const menus = [
   { label: "Tableau de bord", href: "/" },
@@ -25,6 +26,7 @@ export default function TopNav() {
   const router = useRouter();
 
   const [plusOuvert, setPlusOuvert] = useState(false);
+  const [menuMobileOuvert, setMenuMobileOuvert] = useState(false);
   const [compteOuvert, setCompteOuvert] = useState(false);
   const [notificationsOuvertes, setNotificationsOuvertes] = useState(false);
 
@@ -57,7 +59,7 @@ export default function TopNav() {
       setChargementNotifications(true);
 
       const response = await fetch(
-        "http://127.0.0.1:8000/api/notifications",
+        `${API}/api/notifications`,
         {
           method: "GET",
           headers: {
@@ -137,7 +139,7 @@ useEffect(() => {
 
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/api/notifications/${notification.idNotification}/lue`,
+        `${API}/api/notifications/${notification.idNotification}/lue`,
         {
           method: "PUT",
           headers: {
@@ -193,6 +195,7 @@ useEffect(() => {
 
   function ouvrirNotifications() {
     setNotificationsOuvertes(!notificationsOuvertes);
+    setMenuMobileOuvert(false);
     setPlusOuvert(false);
     setCompteOuvert(false);
 
@@ -215,7 +218,7 @@ useEffect(() => {
 
   return (
     <header className="fixed left-0 top-0 z-50 w-full border-b border-slate-200 bg-white shadow-sm">
-      <div className="mx-auto flex min-h-20 max-w-7xl items-center justify-between gap-4 px-5">
+      <div className="relative mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-2 px-3 sm:min-h-20 sm:gap-4 sm:px-5">
         {/* Logo et identité */}
         <Link href="/" className="flex shrink-0 items-center gap-3">
           <Image
@@ -224,7 +227,7 @@ useEffect(() => {
             width={52}
             height={52}
             priority
-            className="h-12 w-12 object-contain"
+            className="h-10 w-10 object-contain sm:h-12 sm:w-12"
           />
 
           <div className="hidden sm:block">
@@ -236,7 +239,7 @@ useEffect(() => {
         </Link>
 
         {/* Navigation principale */}
-        <nav className="flex items-center gap-1">
+        <nav className="hidden items-center gap-1 md:flex">
           {menus.map((menu) => (
             <Link
               key={menu.href}
@@ -291,8 +294,22 @@ useEffect(() => {
           </div>
         </nav>
 
+        <button
+          type="button"
+          aria-expanded={menuMobileOuvert}
+          aria-controls="navigation-mobile"
+          onClick={() => {
+            setMenuMobileOuvert((ouvert) => !ouvert);
+            setCompteOuvert(false);
+            setNotificationsOuvertes(false);
+          }}
+          className="rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-amber-50 md:hidden"
+        >
+          {menuMobileOuvert ? "Fermer" : "Menu"}
+        </button>
+
         {/* Notifications et compte */}
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           {/* Cloche de notifications */}
           <div className="relative">
             <button
@@ -449,6 +466,7 @@ useEffect(() => {
               type="button"
               onClick={() => {
                 setCompteOuvert(!compteOuvert);
+                setMenuMobileOuvert(false);
                 setPlusOuvert(false);
                 setNotificationsOuvertes(false);
               }}
@@ -491,6 +509,31 @@ useEffect(() => {
           </div>
         </div>
       </div>
+
+      {menuMobileOuvert && (
+        <nav
+          id="navigation-mobile"
+          aria-label="Navigation principale mobile"
+          className="absolute left-0 right-0 top-full border-b border-slate-200 bg-white p-3 shadow-lg md:hidden"
+        >
+          <div className="mx-auto grid max-w-7xl gap-1">
+            {[...menus, ...options].map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setMenuMobileOuvert(false)}
+                className={`rounded-lg px-3 py-3 text-sm font-medium ${
+                  estActif(item.href)
+                    ? "bg-amber-50 text-[#705212]"
+                    : "text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </div>
+        </nav>
+      )}
 
       {/* Dégradé doré */}
       <div className="h-0.5 w-full bg-gradient-to-r from-[#705212] via-[#B38528] to-[#8C6A1E]" />

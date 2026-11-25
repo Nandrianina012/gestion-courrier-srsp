@@ -116,7 +116,117 @@ export default function DossiersDivision({
         {filtrePeriode}
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="space-y-3 xl:hidden">
+        {chargement ? (
+          <p className="py-8 text-center text-sm text-slate-500">
+            Chargement des dossiers...
+          </p>
+        ) : dossiersAffiches.length === 0 ? (
+          <p className="py-8 text-center text-sm text-slate-500">{messageVide}</p>
+        ) : (
+          dossiersAffiches.map((dossier) => {
+            const agent = dossier.agents[0];
+            const statutLigne = statutDuDossier(dossier);
+            const enSouffrance = dossierEnSouffrance(dossier);
+            const peutDecider = statutLigne === "En attente";
+            const peutRemettreResponsable =
+              statutLigne === "Visé" || statutLigne === "Rejeté";
+
+            return (
+              <article
+                key={dossier.idDossier ?? dossier.id}
+                className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-slate-500">
+                      Dossier #{dossier.idDossier} · BE n°{dossier.numeroBE}
+                    </p>
+                    <h3 className="mt-1 break-words text-sm font-semibold text-slate-900">
+                      {dossier.referenceDossier}
+                    </h3>
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                      enSouffrance
+                        ? "animate-pulse border-red-300 bg-red-100 text-red-800"
+                        : "border-amber-200 bg-amber-50 text-[#705212]"
+                    }`}
+                  >
+                    {statutLigne || "—"}
+                  </span>
+                </div>
+
+                <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+                  <div className="col-span-2">
+                    <dt className="text-xs text-slate-500">Objet</dt>
+                    <dd className="mt-0.5 break-words text-slate-800">
+                      {dossier.objet}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-slate-500">Reçu le</dt>
+                    <dd className="mt-0.5 text-slate-700">
+                      {formaterDate(dossier.dateReception)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-slate-500">IM agent</dt>
+                    <dd className="mt-0.5 break-all text-slate-700">
+                      {agent?.IM || "—"}
+                    </dd>
+                  </div>
+                </dl>
+
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onDetails(dossier)}
+                    className="min-h-11 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    Détails
+                  </button>
+                  <button
+                    type="button"
+                    disabled={statutLigne !== "En attente"}
+                    onClick={() => onRenvoyer(dossier)}
+                    className="min-h-11 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Renvoyer
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!peutDecider}
+                    onClick={() => onViser(dossier)}
+                    className="min-h-11 rounded-lg bg-[#8C6A1E] px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Viser
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!peutDecider}
+                    onClick={() => onRejeter(dossier)}
+                    className="min-h-11 rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Rejeter
+                  </button>
+                  {peutRemettreResponsable && (
+                    <button
+                      type="button"
+                      onClick={() => onRemettreResponsable(dossier)}
+                      className="min-h-11 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700"
+                    >
+                      Remettre au responsable
+                    </button>
+                  )}
+                </div>
+              </article>
+            );
+          })
+        )}
+      </div>
+
+      <div className="hidden overflow-x-auto xl:block">
         <table className="w-full min-w-[1100px] border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-slate-200 bg-amber-50 text-slate-700">

@@ -55,17 +55,17 @@ export default function DossierDetailsModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-2 sm:p-4"
       onClick={onFermer}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="titre-details-dossier"
-        className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white shadow-xl"
+        className="max-h-[calc(100dvh-1rem)] w-full max-w-3xl overflow-y-auto rounded-lg bg-white shadow-xl sm:max-h-[90vh] sm:rounded-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-4 sm:px-6">
           <div>
             <h2
               id="titre-details-dossier"
@@ -74,7 +74,7 @@ export default function DossierDetailsModal({
               BE n°{dossier.numeroBE}
             </h2>
 
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 break-words text-sm text-slate-500">
               {dossier.referenceDossier}
             </p>
           </div>
@@ -89,7 +89,7 @@ export default function DossierDetailsModal({
           </button>
         </div>
 
-        <div className="grid grid-cols-1 gap-5 px-6 py-5 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 px-4 py-5 sm:grid-cols-2 sm:px-6">
           <div>
             <p className="text-xs text-slate-500">Objet du BE</p>
             <p className="mt-1 text-sm text-slate-900">{dossier.objet}</p>

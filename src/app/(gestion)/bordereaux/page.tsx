@@ -1,7 +1,7 @@
 export default function BordereauxPage() {
   return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold text-slate-800">
+    <div className="p-3 sm:p-8">
+      <h1 className="text-2xl font-bold text-slate-800 sm:text-3xl">
         Gestion des bordereaux
       </h1>
 
